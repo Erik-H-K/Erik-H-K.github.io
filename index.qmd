@@ -16,6 +16,6 @@ about:
       href: kiri1909@gmail.com
 ---
 
-## \# "All models are wrong, some are useful." (George Box)
+## "All models are wrong, some are useful."
 
 Welcome to my non algorithmic webpage, where you are able to go on a deep dive into how some useful models can illuminate the world around us. Enjoy!
