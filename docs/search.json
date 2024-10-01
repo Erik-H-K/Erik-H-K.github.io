@@ -1,0 +1,23 @@
+[
+  {
+    "objectID": "solar.html",
+    "href": "solar.html",
+    "title": "Solar",
+    "section": "",
+    "text": "Calculating inter row spacing for solar panels\nCalculating the spacing between solar panels rows, in order to ensure that shadows from the row in front does not cast a shadow on the row of panels behind it. We begin by calculating the horizontal length of the panel.\n\n\n\n\n\nHere I isolate \\(c\\) in:\n\\[\n\\begin{align*}\ncos(A)&=\\frac{b}{c}\\\\\ncos(A)c&=b\n\\end{align*}\n\\]\nAs my solarpanels have a height of 1.1 meter and is tilted \\(A=13^{\\circ}\\), it can be calculated in R (remember to convert from radians to degress):\n\np_l &lt;- 1.1*cos(13*pi/180)\np_l\n\n[1] 1.071807\n\n\nNow we need to calculate the shadow cast be the panel:\n\\[\n\\begin{align*}\nd &= \\frac{a}{tan(\\beta)} \\\\\n&= \\frac{sin(A)c}{tan(\\beta)}\n\\end{align*}\n\\]\nHere substitute \\(a\\) using the property of \\(sin(A)\\), and \\(\\beta\\) is the angle of sun. In order to get data on the angle of the sun I use the following R-packages:\n\nlibrary(suncalc)\nlibrary(lubridate)\n\n\nAttaching package: 'lubridate'\n\n\nThe following objects are masked from 'package:base':\n\n    date, intersect, setdiff, union\n\nlibrary(ggplot2)\n\n\nsunALT_df &lt;- getSunlightPosition(date = ymd_hm(\"2024/01/01 12:00\")+months(seq(0,11)),\n                    lat = 55, \n                    lon = 12,\n                    keep = c(\"altitude\"))\n\nsunALT_df$altitude_deg &lt;- sunALT_df$altitude*(180/pi)\nsunALT_df\n\n                  date lat lon  altitude altitude_deg\n1  2024-01-01 12:00:00  55  12 0.1984576     11.37078\n2  2024-02-01 12:00:00  55  12 0.3029835     17.35968\n3  2024-03-01 12:00:00  55  12 0.4733542     27.12120\n4  2024-04-01 12:00:00  55  12 0.6791656     38.91332\n5  2024-05-01 12:00:00  55  12 0.8552644     49.00304\n6  2024-06-01 12:00:00  55  12 0.9740378     55.80826\n7  2024-07-01 12:00:00  55  12 0.9958690     57.05909\n8  2024-08-01 12:00:00  55  12 0.9091945     52.09300\n9  2024-09-01 12:00:00  55  12 0.7364647     42.19632\n10 2024-10-01 12:00:00  55  12 0.5315600     30.45614\n11 2024-11-01 12:00:00  55  12 0.3341991     19.14820\n12 2024-12-01 12:00:00  55  12 0.2117176     12.13053\n\n\n\na &lt;- 1.1*sin(11*pi/180)\nd = a/(tan(sunALT_df$altitude))\nd\n\n [1] 1.0436846 0.6714151 0.4097869 0.2599957 0.1824350 0.1425968 0.1359966\n [8] 0.1634360 0.2315062 0.3569468 0.6044809 0.9765103\n\n\nI now add the length of the panel and calculate the space needed for each month\n\ntot_w &lt;- d + p_l\nw_df &lt;- data.frame(total_width = tot_w, month = sunALT_df$date)\n\nrow3 &lt;- (7.27-p_l)/3\nrow4 &lt;- (7.27-p_l)/4\n\nggplot(data = w_df, aes(x = as.Date(month), y = total_width)) + \n  geom_bar(stat = \"identity\", width = 0.1, color = \"blue\") + geom_point() + \n  geom_hline(yintercept = c(row3, row4), linetype=\"dashed\") + \n  scale_x_date(date_labels = \"%b\", date_breaks = \"1 month\") + theme_bw()"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Erik H. K",
+    "section": "",
+    "text": "“All models are wrong, some are useful.” (George Box)\n\nWelcome to my non algorithmic webpage, where you are able to go on a deep dive into how some useful models can illuminate the world around us. Enjoy!"
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site\n\n1 + 1\n\n[1] 2"
+  }
+]

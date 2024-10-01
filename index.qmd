@@ -1,0 +1,21 @@
+---
+title: "Erik H. K"
+image: media/IMG_4615.jpeg
+toc: false
+about: 
+  template: jolla
+  image-shape: round
+  image-width: 17em
+  links:
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/erik-hedegaard-knudsen/
+    - text: GitHub
+      href: https://github.com/Skinboy1999
+    - text: Email
+      href: kiri1909@gmail.com
+---
+
+## \# "All models are wrong, some are useful." (George Box)
+
+Welcome to my non algorithmic webpage, where you are able to go on a deep dive into how some useful models can illuminate the world around us. Enjoy!

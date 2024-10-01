@@ -1,0 +1,24 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Erik H. K"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - about.qmd
+      - solar.qmd
+
+format:
+  html:
+    theme: 
+      light: Litera
+      dark: Slate
+    css: styles.css
+    toc: true
+    page-layout: full
+
+editor: visual
+

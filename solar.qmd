@@ -1,0 +1,73 @@
+---
+title: "Solar"
+---
+
+# Calculating inter row spacing for solar panels
+
+Calculating the spacing between solar panels rows, in order to ensure that shadows from the row in front does not cast a shadow on the row of panels behind it. We begin by calculating the horizontal length of the panel.
+
+![](Skærmbillede%202024-09-26%20kl.%2013.43.42.png){fig-align="center"}
+
+Here I isolate $c$ in:
+
+$$
+\begin{align*}
+cos(A)&=\frac{b}{c}\\
+cos(A)c&=b
+\end{align*}
+$$
+
+As my solarpanels have a height of 1.1 meter and is tilted $A=13^{\circ}$, it can be calculated in R (remember to convert from radians to degress):
+
+```{r}
+p_l <- 1.1*cos(13*pi/180)
+p_l
+```
+
+Now we need to calculate the shadow cast be the panel:
+
+$$
+\begin{align*}
+d &= \frac{a}{tan(\beta)} \\
+&= \frac{sin(A)c}{tan(\beta)}
+\end{align*}
+$$
+
+Here substitute $a$ using the property of $sin(A)$, and $\beta$ is the angle of sun. In order to get data on the angle of the sun I use the following R-packages:
+
+```{r}
+library(suncalc)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r}
+sunALT_df <- getSunlightPosition(date = ymd_hm("2024/01/01 12:00")+months(seq(0,11)),
+                    lat = 55, 
+                    lon = 12,
+                    keep = c("altitude"))
+
+sunALT_df$altitude_deg <- sunALT_df$altitude*(180/pi)
+sunALT_df
+```
+
+```{r}
+a <- 1.1*sin(11*pi/180)
+d = a/(tan(sunALT_df$altitude))
+d
+```
+
+I now add the length of the panel and calculate the space needed for each month
+
+```{r}
+tot_w <- d + p_l
+w_df <- data.frame(total_width = tot_w, month = sunALT_df$date)
+
+row3 <- (7.27-p_l)/3
+row4 <- (7.27-p_l)/4
+
+ggplot(data = w_df, aes(x = as.Date(month), y = total_width)) + 
+  geom_bar(stat = "identity", width = 0.1, color = "blue") + geom_point() + 
+  geom_hline(yintercept = c(row3, row4), linetype="dashed") + 
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") + theme_bw()
+```
