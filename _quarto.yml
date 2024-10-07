@@ -7,8 +7,9 @@ website:
   navbar:
     left:
       - href: index.qmd
-        text: Home
-      - about.qmd
+        text: home
+      - href: about.qmd
+        text: who am I
       - href: projects.qmd
         text: projects
       - href: stochastic_posts.qmd
