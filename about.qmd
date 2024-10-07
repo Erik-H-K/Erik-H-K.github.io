@@ -1,9 +1,109 @@
 ---
-title: "About"
+title: "Who Am I?"
 ---
+*A page dedicated to exploring my professional journey in data science and political science, and what I’m up to when I’m not diving into data.*
 
-About this site
+# Professional Life: "Data-Driven Political Scientist"
+My name is Erik, a dedicated political science graduate specializing in data science. My expertise bridges the gap between mathematical concepts and social theories, allowing me to model and analyze complex social systems. With hands-on experience from internships and research assistant roles, I have worked on geospatial analyses, ethnic conflict research, data-driven policy reports, and conducted a meta analysis of the realm of political communication. My international experience includes an internship at the Danish Embassy in Kenya, where I contributed to the Danish peace and stabilization efforts in the Horn of Africa. I bring a unique blend of technical and analytical skills, proficient in Python, R, SQL, and geospatial analysis.
 
-```{r}
-1 + 1
+## Work Expereince
+### Research Assistant: Meta-analysis, Political Communication, Aarhus University (2024)
+```{=html}
+<details>
+<summary>Responsibilities</summary>
 ```
+- Contributed to the development of a meta-analysis on the effect of media's use of personal stories on political attribution of responsibility.
+- Developed skills in conducting systematic meta-analyses and using new methods to reduce bias in research results.
+
+</details>
+
+### Campaign and Event Planner, Danish Society for Nature Conservation Aarhus (2024)
+```{=html}
+<details>
+<summary>Responsibilities</summary>
+```
+- Organized a political campaign for the 2024 European Parliament elections.
+- Led environmental excursions to locations like Lille Vildmose and Mols Bjerge.
+
+</details>
+
+### Intern, Danish Embassy to Somalia in Nairobi, Kenya (2022-2023)
+```{=html}
+<details>
+<summary>Responsibilities</summary>
+```
+- Assisted in the development of the Danish peace and stabilization program for the Horn of Africa 2022-2026.
+- Analyzed and wrote a data-driven report on the 2022 offensive against the terrorist organization al-Shabaab.
+- Gained experience managing large development programs and working with peace and conflict in practice.
+
+</details>
+
+### Research Assistant: GIS Analysis of Ethnic Conflicts, Aarhus University (2021-2022)
+```{=html}
+<details>
+<summary>Responsibilities</summary>
+```
+- Built a dataset to explore how clashes of norms between ethnic groups influence conflicts.
+- Gained experience working independently and performing tasks related to the preparation of scientific articles.
+
+</details>
+
+### Election Observer, Hungary, Silba – Initiative for Dialogue and Democracy (2018)
+```{=html}
+<details>
+<summary>Responsibilities</summary>
+```
+- Monitored whether Hungarian polling stations adhered to OSCE guidelines for democratic elections.
+
+</details>
+
+## Education 
+### Specialization in Data Science: Department of Mathematics, Aarhus University(2023-2024)
+```{=html}
+<details>
+<summary>Courses</summary>
+```
+- [Mathematical Statistics](https://kursuskatalog.au.dk/da/course/123959/Matematisk-Statistik): *Statistical Modeling, Maximum Likelihood Estimation, Bootstrap & Permutation Tests, Regression Analysis, General Linear Model, Data Simulation in R, Goodness of Fit Tests, Parametric Methods, Hypothesis Testing*
+- [Numerical Algebra](https://kursuskatalog.au.dk/da/course/123848/Numerisk-lineaer-algebra): *Vectors and Matrices, Singular Value Decomposition, Linear Transformations, Eigenvalues and Eigenvectors, Python for Matrix Computations.*
+- [Introduction to programming with a scientific application](https://kursuskatalog.au.dk/da/course/123832/Introduktion-til-programmering-med-videnskabelige-anvendelser): *Basic Python Programming Concepts, Object-Oriented Programming, Algorithmic Techniques, Program Development, Scientific Applications.*
+- [Introduction to Mathematics and Optimization](https://kursuskatalog.au.dk/da/course/126689/Introduktion-til-sandsynlighedsteori-og-statistik): *Mathematical Optimization, Convex Functions, Linear Systems, Differential Calculus, Karush-Kuhn-Tucker Conditions.* 
+- [Introduction to probability and statistics](https://kursuskatalog.au.dk/da/course/126689/Introduktion-til-sandsynlighedsteori-og-statistik): *Stochastic Variables, Probability Distributions, Hypothesis Testing, Markov Chains, R Programming for Statistical Analysis.*
+
+</details>
+
+### MA in Political Science, Aarhus University (2020-2023)
+```{=html}
+<details>
+<summary>Courses and Master's Thesis</summary>
+```
+- **Master's Thesis**: Do It Yourself Community Security: A comparative study of vigilante group activity across the African continent
+- [Causes of Intra-state Peace and Conflict](https://kursuskatalog.au.dk/da/course/125956/235E24-Causes-of-Intra-state-Peace-and-Conflict): *Intra-State Conflict, Peace and Conflict Theories, Conflict Measurement, Civil War Causes, Quantitative Conflict Analysis.*
+- Espionage and international politics: *The Intelligence Cycle and Analysis, the Intelligence community, Chinese Espionage agencies (MSS & MPS), Chinese Strategic Culture*
+- Political Data Science: Digital Skills & Applied Statistical Analysis: *Data Science in Public Administration, Automated Data Collection, Statistical Modeling, Big Data Ethics, Visualization in R*
+
+</details>
+
+### Guest student, Copenhagen University (2020-2021)
+```{=html}
+<details>
+<summary>Courses</summary>
+```
+- [Summer school: Introduction to Social Data Science, Copenhagen Center for Social Data Science (SODAS)](https://kurser.ku.dk/course/a%C3%98kk08216u/2021-2022): *Social Data Science, Web Scraping and APIs, Data Manipulation and Visualization, Machine Learning Algorithms, Ethical Data Practices*
+- [Introduction to Data Science, Department of Computer Science](https://kurser.ku.dk/course/ndak16003u/2021-2022): *Machine Learning Algorithms, Classification and Regression Methods, Bayesian Statistics, Data Clustering and PCA, Probabilistic Data Modelling*
+- [From paper to practice the implementation challenges in the European Union environmental policy](https://kurser.ku.dk/course/astk18361u/2020-2021): *The Birds Directive, EU Environmental Policy, Policy Implementation Challenges, European Green Deal, Environmental Governance, Climate Leadership in the EU*
+- [Economic Sociology](https://kurser.ku.dk/course/a%C3%98kb08030u/2021-2022): *Economic Sociology, Sociological Theories of Economic Behavior, Classical Economic Sociology (Weber, Marx, Durkheim, Simmel), Contemporary Economic Sociology (Bourdieu, Giddens, Habermas), Social Embeddedness and Economic Exchange*
+
+</details>
+
+### Bachelor in Political Science, Aarhus University (2016-2019)
+```{=html}
+<details>
+<summary>Bachelor Thesis</summary>
+```
+- **Bachelor Thesis**: THE SOCIAL IN DEMONSTRATING: THE EFFECT OF SOCIAL CAPITAL ON PROTESTS
+
+</details>
+
+# Hobbies and Personal Interests: "Adventurer and Nature Enthusiast"
+Outside of work, I am passionate about the outdoors. I regularly embark on long-distance biking trips and challenging hikes, such as biking 4443 kilometers around the Baltic Sea or trekking the mountains of Norway, Sweden, and Romania with minimal supplies. These adventures push my limits, reflect my curiosity, and mirror my commitment to overcoming challenges. I am also actively involved in environmental causes, organizing events for the Danish Society for Nature Conservation.
+

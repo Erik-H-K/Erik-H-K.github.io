@@ -1,0 +1,1 @@
+https://spatial.faoswalim.org/geoserver/ows?outputFormat=SHAPE-ZIP&service=WFS&srs=EPSG%3A4326&request=GetFeature&format_options=charset%3AUTF-8&typename=geonode%3ASOM_regional_capitals&version=1.0.0

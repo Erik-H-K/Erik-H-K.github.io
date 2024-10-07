@@ -10,9 +10,11 @@ about:
     - icon: linkedin
       text: LinkedIn
       href: https://www.linkedin.com/in/erik-hedegaard-knudsen/
-    - text: GitHub
+    - icon: github
+      text: GitHub
       href: https://github.com/Skinboy1999
-    - text: Email
+    - icon: envelope
+      text: Email
       href: kiri1909@gmail.com
 ---
 

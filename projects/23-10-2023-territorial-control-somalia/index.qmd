@@ -1,0 +1,1198 @@
+---
+title: "Territorial Control Somalia"
+author: "Erik H. Knudsen"
+description: |
+  Using war related fires and conflict observations to map territorial control in Somalia
+date: 2023-10-23
+categories: [Spatial analysis, Conflict research, Somalia]
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+image: disc_terr_ctrl.png
+draft: false
+bibliography: references.bib
+---
+
+# Introduction
+
+For 25 years, the terrorist organisation al-Shabaab has wrought a reign of terror over Somalia, destabilising the country, terrorising communities, and hampering growth and stability. The organisation gained momentum after the Ethiopian-led invasion of Somalia in 2006, when the parent organisation of al-Shabaab, Islamic Courts Union, was ousted from Mogadishu [@mengisteab2013: 138-139]. In the following years, al-Shabaab asserted itself by controlling large parts of central and southern Somalia, including the capital Mogadishu, and the port city of Kismayo, subsequently forming a quasi-government in these areas [@bacon2019; @polgeonow.com2012]. However things changed in 2011 when the Transnational Federal Government of Somalia and the African Union led multinational military force, AMISOM, wrested a significant amount of territory from al-Shabaab, including Mogadishu and Kismayo. This resulted in al-Shabaab only controlling mostly rural areas and was forced to revert to its insurgency roots [@gaid2022].\
+Al-Shabab's control of these areas has since 2012 mostly been unchallenged. From mid-2022 al-Shabaab was again facing threats to its territorial control. Because a coalition between Somali state forces and a selection of Somali clan militias initiated an offensive against the group. The presence of the clan militias has according to some analysts been a sign of a popular uprising against al-Shabaab [@africaconfidential2022; @nor2022].\
+With the launch of the second phase of the offensive in March last year, which by now seemed to be stalled [@valmary2023; @crisisgroup2023], and the planned withdrawal of African Union military forces from Somalia at the end of this year [@stares2024], it is necessary that we take a look at the current state of this conflict.\
+The analysis will use a series of different quantitative data sources and advanced machine learning and statistical methods in order to establish where the offensive has been taking place, and the subsequent character and placement of the reprisal attacks by al-Shabaab. Moreover, the analysis will also seek to assess whether the offensive has changed the size of the land controlled by al-Shabaab, and understand which actors are most prominent in the fight against al-Shabaab.
+
+The period being covered stretches from the first of August 2022 to the end of October 2023. Methodological and analytical decisions are briefly discussed throughout the document, and the related R-code for each section is also attached.\
+
+# Data
+
+Data on conflict events is provided by The Armed Conflict Location & Event Data Project (ACLED). It is generated using news sources, expert and NGO reports on violent and non-violent conflict events in Somalia. Conflict events consist of a series of actions realised by one actor or between multiple actors. Events are categorised as to whether they are battles, attacks on civilians, acts of remote violence in the form of, for example, suicide bombs or drone attacks, and lastly, if they constitute non-violent strategic developments, such as the non-violent transfer of territory [@raleigh2010]. The data source is affected by reporting bias, meaning that events that do not get the same amount of media exposure due to a lack of media presence in the area where the event is taking place, i.e., rural areas, or the event has a low number of casualties, are less likely to be sampled [@weidmann2016]. In order to combat this bias, the analysis also applies another layer of data points relating to the placement and timing of conflict related fires. Thereby ensuring that conflicts that are not being picked up by ACLED are also included in the analysis. Conflict related fires are obtained using satellite recordings of fires in Somalia, which are subsequently classified by a machine learning model as being either conflict related fires or natural fires. I follow the approach outlined by the Economist [@theeconomist2023], and train the classifier on the time and the placement of past fires taking into account the cloud cover of the assessed area.
+
+# Analysis
+
+## The location of the fight against al-Shabaab and the groups fighting al-Shabaab
+
+Looking at the map bellow (figure 1), which depicts the position and number of casualties of attacks and strategic developments against al-Shabaab in the analysed period, we see that the vast majority of such activities are taking place in the Hiraan (19%), Galgaduud (14%), Middle (17%) and Lower Shabelle (11%) regions. A majority of these activities against al-Shabaab are either armed clashes with the group or violent seizure of the group's territory by Somali government forces. These activities in the Hiraan region resulted in 758 causalities, whereas in the Middle and Lower Shabelle they resulted in a total of 1924 causalities. However, another major activity is the non-violent seizure of al-Shabaab territory by government forces, which corroborates reports that al-Shabaab forces have reverted to their previous tactic of withdrawal without confrontation, a tactic they had previously only displayed when confronted by AU forces[@gaid2022: 32]. To a lesser degree than the three before-mentioned regions, the fight against al-Shabaab is also taking place in Galgaduud, Bay, and Lower Juba, where battles and explosions have killed a total of 228 people.
+
+```{r}
+#| warning: false
+#| fig-cap: "Figure 1 - Attacks or strategic developments\nagainst al-Shabaab"
+###############################
+######## Generating map of attacks and strategic-
+######## developments against Al-Shabaab
+###############################
+
+### Preparing environment 
+
+# Loading libaries
+library(sf)
+library(stars)
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+
+
+# sf option 
+sf_use_s2(FALSE)
+
+
+##########
+## Loading data 
+#########
+
+## Loading regional capitals 
+# https://spatial.faoswalim.org/layers/geonode:SOM_regional_capitals/metadata_detail
+somali_cap <- read_sf("source-data/regional-cap/SOM_regional_capitals/SOM_regional_capitals.shp")
+
+## Creating point for the national capital
+national_cap <- data.frame("NAME" = "Mogadishu",
+                           "Y_COORD" = 2.0392,
+                           "X_COORD" = 45.3419)
+
+national_cap <- national_cap |> 
+  st_as_sf(                                   # Creating a sf object
+  coords= c("X_COORD", "Y_COORD"),
+  agr = "constant",
+  crs = st_crs(somali_cap),        
+  stringsAsFactors = FALSE,
+  remove = TRUE
+)
+
+somali_cap <- somali_cap |> 
+  filter(NAME %in% c("XUDUR", "BAYDHABA", "DHUUSAMARREEB", "GARBAHAAREY", "BELET WEYNE", "KISMAAYO", "MARKA", "BU'AALE", "JOWHAR", "GAALKACYO"))
+
+## Loading Somali regional borders
+# https://data.humdata.org/dataset/cod-ab-som
+somail_reg <- read_sf("source-data/adm-polygons/som-administrative-divisions-shapefiles/Som_Admbnda_Adm1_UNDP.shx")
+
+# Setting crs
+somail_reg <- st_transform(somail_reg, st_crs(somali_cap))
+
+## Changing names in order to ease interpretation
+somail_reg <- somail_reg |> 
+  mutate(admin1Name = if_else(admin1Name == "Banadir", "Mogadishu", admin1Name))
+
+
+## Selecting regions for territorial analysis 
+somail_reg_subset <-  somail_reg |> 
+  filter(admin1Name %in% c("Mudug", "Galgaduud", "Hiraan", "Middle Shabelle", "Mogadishu", 
+                           "Lower Shabelle", "Middle Juba", "Lower Juba", "Bay", "Gedo", "Bakool"))
+
+
+###############################
+######## Loading conflict   
+######## fire data  
+###############################
+
+# Loading war fires data set 
+war_fire <- read_csv('output-data/all_fires_all_cols_exact_pop_and_filter_2022_2023.csv')
+
+# Converting it to an sf object 
+war_fires_sf <- war_fire |> 
+  filter(war_fire == 1) |> 
+  mutate(year_month = str_c(as.character(year),"-",as.character(month)), 
+         control = 0.5) |> 
+  mutate_at(vars(longitude, latitude), as.numeric) |>   # coordinates must be numeric
+  st_as_sf(                                   # Creating a sf object
+    coords= c("longitude", "latitude"),
+    agr = "constant",
+    crs = st_crs(somali_cap),        
+    stringsAsFactors = FALSE,
+    remove = TRUE
+  )
+
+
+###############################
+######## Loading    
+######## ACLED data 
+###############################
+
+##### 
+## Loading and preparing ACLED data 
+##### 
+ACLED_df <- read_csv("source-data/ACLED-data/2022-08-01-2023-10-31-Somalia.csv")
+
+ACLED_df <- ACLED_df |> 
+  mutate(actor_cat = case_when(
+    inter1 == 1 ~ "State forces",
+    inter1 == 2 ~ "Rebel groups",
+    inter1 == 3 ~ "Political militias", 
+    inter1 == 4 ~ "Identity militias",
+    inter1 == 5 ~ "Rioters", 
+    inter1 == 6 ~ "Protesters",
+    inter1 == 7 ~ "Civilians", 
+    inter1 == 8 ~ "External/other forces"
+  ))
+
+###### Coding events for territorial control 
+ACLED_df <- ACLED_df |> 
+  mutate(control = case_when(
+    sub_event_type == "Armed clash" ~ 0.5,
+    sub_event_type == "Attack" & interaction == 47 ~ 0.5,
+    sub_event_type == "Change to group/activity" & interaction == 10 ~ 0.75,
+    sub_event_type == "Other" & interaction == 10 ~ 0.75,
+    sub_event_type == "Disrupted weapons use" & interaction == 12 ~ 0.75,
+    sub_event_type == "Looting/property destruction" & interaction == 12 ~ 0.5,
+    sub_event_type == "Government regains territory" ~ 1,
+    sub_event_type == "Disrupted weapons use" & interaction == 13 ~ 0.75, 
+    sub_event_type == "Grenade" & interaction == 13 ~ 0.75, 
+    sub_event_type == "Non-state actor overtakes territory" & actor_cat == "Rebel groups" ~ 0,
+    sub_event_type == "Non-state actor overtakes territory" & actor_cat == "External/other forces" ~ 1,
+    sub_event_type == "Non-state actor overtakes territory" & inter1 == 1 & actor2 == "Al Shabaab" ~ 0.75,
+    sub_event_type == "Headquarters or base established" & actor_cat == "State forces" ~ 1,
+    sub_event_type == "Headquarters or base established" & actor_cat == "External/other forces" ~ 1,
+    sub_event_type == "Headquarters or base established" & actor_cat == "Rebel groups" ~ 0,
+    sub_event_type == "Non-violent transfer of territory" & actor_cat == "State forces" ~ 1,
+    sub_event_type == "Non-violent transfer of territory" & actor_cat == "Rebel groups" ~ 0,
+    event_type == "Explosions/Remote violence" & actor_cat == "State forces" ~ 0.25,
+    event_type == "Explosions/Remote violence" & actor_cat == "External/other forces" ~ 0.25,
+    event_type == "Explosions/Remote violence" & actor_cat == "Rebel groups" ~ 0.75
+  ))
+##################### Creation of territorial control data
+### Creating spatial object for events
+ACLED_sf <- ACLED_df |> 
+  filter(!is.na(ACLED_df$control)) |> 
+  mutate(event_date_1 = dmy(event_date), 
+         month_date = month(event_date_1),
+         year_month = paste0(as.character(year),"-",as.character(month_date))) |> 
+  mutate_at(vars(longitude, latitude), as.numeric) |>   # coordinates must be numeric
+  st_as_sf(                                   # Creating a sf object
+    coords= c("longitude", "latitude"),
+    agr = "constant",
+    crs = st_crs(somali_cap),        
+    stringsAsFactors = FALSE,
+    remove = TRUE
+  ) |> 
+  select(-c(iso,event_id_cnty, source, source_scale))
+
+######### Creating data sets on al-Shabaab attacks and against al-Shabaab
+### Attack against AS 
+AS_attacked_df <- ACLED_df %>% 
+  filter(actor2 == "Al Shabaab") %>% 
+  filter(actor1 != "Al Shabaab") |> 
+  mutate(event_type = as.factor(event_type),
+         event_date_1 = dmy(event_date)) %>% 
+  filter(event_date_1 >= "2022-08-01")
+
+AS_attacked_sf <- AS_attacked_df %>%
+  mutate_at(vars(longitude, latitude), as.numeric) %>%   # coordinates must be numeric
+  st_as_sf(                                   # Creating a sf object
+    coords= c("longitude", "latitude"),
+    agr = "constant",
+    crs = st_crs(somali_cap),        
+    stringsAsFactors = FALSE,
+    remove = TRUE
+  )
+
+############################ 
+## Creating the map 
+############################ 
+
+# Define the target CRS for long-lat (EPSG:4326)
+target_crs <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
+
+# Transform the data to long-lat
+AS_attacked_sf <- st_transform(AS_attacked_sf, crs = target_crs)
+war_fires_sf <- st_transform(war_fires_sf, crs = target_crs)
+somail_reg <- st_transform(somail_reg, crs = target_crs)
+
+
+##### Event map 
+#### Attacks against al-Shabaab
+# Take the centroid of each multipolygon in labeled_regions
+labeled_regions_centroid <- st_centroid(somail_reg)
+
+# Convert event_type to factor for proper coloring
+AS_attacked_sf$event_type <- as.factor(AS_attacked_sf$event_type)
+
+# Create a base map
+m <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron")  # You can choose a different tile provider
+
+m <- m |> 
+  addCircleMarkers(data = war_fires_sf,
+                   fillOpacity = 0.65,
+                   radius = 1,
+                   color = "blue",
+                   popup = ~paste("Type: Conflict related fire", "<br> Date: ", date))
+
+# Add circles for AS attacks with popups
+
+pal <- colorFactor(
+  palette = c("#66c2a5", "#fc8d62", "#8da0cb"),
+  domain = AS_attacked_sf$event_type)
+
+m <- m %>%
+  addCircleMarkers(data = AS_attacked_sf, 
+                   color = ~pal(event_type), 
+                   radius = ~sqrt(fatalities) * 1,  # Adjust the multiplier for smaller circles
+                   fillOpacity = 0.65,
+                   popup = ~paste("Type: ", event_type, "<br> Fatalities: ", fatalities, "<br> Date: ", event_date_1))
+
+# Add polygons for administrative regions
+m <- m %>%
+  addPolygons(data = somail_reg, fill=F, color = "black", weight = 0.5, fillOpacity = 0.8)
+
+# Customize the map appearance
+m <- m %>%
+  addLegend(position = "bottomright", 
+            colors = c("#66c2a5", "#fc8d62", "#8da0cb", "blue"), 
+            labels = c(levels(AS_attacked_sf$event_type),"Conflict related fires"),
+            opacity = 0.7)
+
+# Display the map
+m
+```
+
+```{=html}
+<details>
+<summary>Table 1: Number of activities per region</summary>
+```
+```{r}
+# Activities per region
+table_1 <- AS_attacked_df |> 
+  group_by(admin1) |> 
+  summarise(count = n()) |> 
+  ungroup() |> 
+  mutate(frac = round((count/sum(count))*100)) |> 
+  rename("Region" = "admin1", "Number of activities" = "count", "Fraction" = "frac")
+knitr::kable(table_1)
+```
+
+</details>
+
+```{=html}
+<details>
+<summary>Table 2: Casualties per region</summary>
+```
+```{r}
+# Casualties per region 
+table_2 <- AS_attacked_df |> 
+  group_by(admin1) |> 
+  summarise(n_fat = sum(fatalities)) |> 
+  rename("Region" = "admin1", "Number of casualties" = n_fat)
+knitr::kable(table_2)
+```
+
+</details>
+
+Reports have highlighted that the offensive against al-Shabaab was largely initiated by clans in al-Shabaab-controlled areas in the Hiraan region whom, because of the recent drought in Somalia, refused to pay taxes to al-Shabaab's tax collectors and therefore revolted against al-Shabaab [@africaconfidential2022; @nor2022], a finding that this analysis confirms. Because looking at table table 3, which shows activities against al-Shabaab for different actors per region, it becomes evident that in the Hiraan region, 14.08% of the activities against al-Shabaab were initiated by the Hiraan-based clan militias Macawiisley and Hawadle, though Somali military and special forces still account for 70% of the activities against al-Shabaab in the region. These militia can be categorised as a community-initiated self-defence force, because the group mainly consists of locales who, in the absence of government-sponsored security guarantees, themselves initiate the provision of their own and their community's security [@ibrahimshire2022; @nor2022; @schuberth2015]. It is not new for members of especially Macawiisley Clan Militia to revolt against al-Shabaab as this group successfully took up arms against al-Shabaab in 2014, owing also to al-Shabaab's excessive taxation of people in the Hiraan region [@ibrahimshire2022: 17]. This finding confirms the result of another study of the mobilisation of community-initiated self-defence forces, that such groups are more likely to emerge in a conflict if its members in the past have successfully mobilised self-defence forces [@osorio]. A noteworthy difference between the Macawiisley revolt in 2014 and the present one is the duration because the former ended rather quickly due to the lack of government support [@ibrahimshire2022]. Thus, the current one's longevity seems to some extent to be a product of the current government's swift support to the clan militia.
+
+```{=html}
+<details>
+<summary>Table 3: Activities against al-Shabaab per regon for different actors</summary>
+```
+```{r}
+# Casualties per region 
+table_3 <- AS_attacked_df |> 
+     group_by(admin1, actor1) |> 
+     summarise(n_act = n()) |> 
+     ungroup() |> 
+     group_by(admin1) |> 
+     mutate(frac_act = round((n_act/sum(n_act))*100)) |> 
+  rename("Region" = "admin1", "Actor" = "actor1" ,"Number of activities per region" = n_act, "Fraction of activities per region" = "frac_act")
+knitr::kable(table_3)
+```
+
+</details>
+
+A similar picture also emerges in Middle Shabelle, where it is the Abgal Clan Militia, who, together with Somali security forces, accounts for the majority of activity against al-Shabaab. A reason for the participation of the Abgal clans in the offensive could be because the current president of Somalia, Hassan Shikh Mohamud, himself comes from the Abgal clan. Interestingly, this findings goes against reports of the non-participation of the Abgal clan in the offensive against al-Shabaab [@africaconfidential2022] .
+
+Table 3 also reveals the stationary character of clan militias, as their activity level is limited to specific regions, since they are rarely active in other regions than their home region. The only actors who are active across regions are the Somali military forces. This finding highlights a special characteristic of the offensive against al-Shabaab; it is in some ways, dependent on whether government forces can convince local clan militias to take up arms against al-Shabaab, in order for the offensive to move into new regions. It should be noted that in regions such as Bay and Galgaduud it is government forces, which for the most part is leading the fight against al-Shabaab, with minor support from clan militias.
+
+Moving from the individual regions to the whole of Somalia, figure 2 depicts the number of encounters against al-Shabaab per actor found in the security arena in Somalia. The thickness of the line between an actor and al-Shabaab indicates the number of violent or strategic encounters between the actors. Thereby, the figure allows the analysis to understand which actors are most involved in the fight against al-Shabaab. With 423 encounters with al-Shabaab it becomes clear that throughout the offensive it is SNA who have been leading the fight against al-Shabaab. The organisation has in 1/3 of the time engaged in battles with al-Shabaab and the violent seizure of territory, but 50% of SNA activity against al-Shabaab involves the non-violent seizure of territory from the group. Frequently SNA forces are accompanied by either Macawiisley or Abgal clan militias in different operations, but the militias also often face al-Shabaab themselves, thereby underpinning the active role of clan militias in the offensive.
+
+Looking at international actors operating in Somalia, in the form of the AU lead ATMIS mission and countries such as Turkey or the USA, it is evident that of all the international actors engaged, the USA's army is heavily invested in the fight against al-Shabaab. However, these activities is mostly airstrikes or the use of drones. Contrary to this, the other international actors' engagements in the conflict seems minimal and also when comparing to past offensives against al-Shabaab [@gaid2022]. In total, ATMIS forces had only 34 encounters with al-Shabaab, which for the most part have been the use of remote explosions such as drones or assisting in securing a former al-Shabaab controlled area. Though, ATMIS forces have, in a few instances, fought directly against al-Shabaab or alongside SNA forces when capturing villages from al-Shabaab, in for instance, lower Shabelle.
+
+```{r}
+#| warning: false
+#| fig-cap: "Figure 2 - Attacks or strategic developments\nagainst al-Shabaab per actor"
+############
+##### Only attack against AS 
+############
+## libraries needed to conduct network analysis 
+
+library(tidygraph)
+library(ggraph)
+
+## ACLED from September 
+ACLED_year <- ACLED_df %>% 
+  mutate(event_type = as.factor(event_type),
+         event_date_1 = dmy(event_date)) %>% 
+  filter(event_date_1 >= "2022-08-01")
+
+### Creating new data base only against AS
+ACLED_year_AS <- ACLED_year |> 
+  filter(actor2 == "Al Shabaab") |>  
+  filter(!(actor1 %in% c("Unidentified Armed Group (Somalia)", "Unidentified Clan Militia (Somalia)", "Unidentified Armed Group (Somalia)", "Al Shabaab"))) |> 
+  filter(!(assoc_actor_1 %in% c("Unidentified Armed Group (Somalia)", "Unidentified Military Forces")))
+
+### Combining actors and associated actors
+actor1_df1 <- ACLED_year_AS %>% 
+  select(actor1, actor2, inter1, inter2)
+
+assoc1_df2 <- ACLED_year_AS %>% 
+  filter(!is.na(assoc_actor_1)) %>% 
+  select(assoc_actor_1, actor2, inter1, inter2) %>% 
+  mutate(assoc_actor_1 = if_else(
+    str_detect(assoc_actor_1, ";"), str_split(assoc_actor_1, ";", simplify = T)[,2], 
+    assoc_actor_1),
+    assoc_actor_1 = str_trim(assoc_actor_1, side = "left"))
+
+act_inter_df <- data.frame(actor = c(ACLED_year_AS$actor1, ACLED_year_AS$actor2),
+                           inter = c(ACLED_year_AS$inter1, ACLED_year_AS$inter2))
+
+act_inter_df <- act_inter_df %>% 
+  distinct() %>% 
+  as_tibble()
+
+assoc1_df2 <- assoc1_df2 %>% 
+  left_join(act_inter_df, by = c("assoc_actor_1" = "actor")) %>% 
+  select(-c(inter1)) %>% 
+  rename("inter1" = "inter",
+         "actor1" = "assoc_actor_1") %>% 
+  select(actor1, actor2, inter1, inter2) %>% 
+  mutate(inter1 = if_else(is.na(inter1),4,inter1))
+
+
+ACLED_assoc_df <- bind_rows(actor1_df1, assoc1_df2)
+
+ACLED_assoc_df <-  ACLED_assoc_df %>% 
+  mutate(actor1 = as.factor(actor1),
+         actor1 = fct_recode(actor1, "Hawadle Yaber Dige Sub-Clan Militia (Somalia)" = "Hawadle-Yaber Dige Sub-Clan Militia (Somalia)", 
+                             "Police Forces of Somalia (2022-)" = "Police Forces of Somalia (2022-) Special Forces",
+                             "Southwest Police" = "Police Forces of Somalia (2022-) Southwest Special Police Forces",
+                             "NISA" = "Military Forces of Somalia (2022-) National Intelligence and Security Agency",
+                             "NISA" = "Military Forces of Somalia (2022-) Jubaland Intelligence and Security Agency"),
+         actor1 = as.character(actor1),
+         inter1 = if_else(actor1 == "NISA", 1, inter1)) #%>% 
+#arrange(fct_relevel(actor1, "Al Shabaab"))
+
+
+## Creating network nodes based on actors
+actor1_as <- ACLED_assoc_df %>% 
+  distinct(actor1) %>%
+  rename(label = actor1)
+
+actor2_as <- ACLED_assoc_df %>% 
+  distinct(actor2) %>% 
+  rename(label = actor2)
+
+# df for class of group
+act1_class_as <- ACLED_assoc_df %>% 
+  distinct(actor1, inter1) %>% 
+  rename(label = actor1, inter = inter1)
+
+act2_class_as <- ACLED_assoc_df %>% 
+  distinct(actor2, inter2) %>% 
+  rename(label = actor2, inter = inter2)
+
+
+# Combines the the two dfs 
+act_class_as <- rbind(act1_class_as, act2_class_as)
+act_class_as <- distinct(act_class_as)
+
+# Final df for nodes 
+nodes_as <- full_join(actor1_as, actor2_as, by = "label") %>% 
+  rowid_to_column("id") %>% 
+  mutate(label = if_else(str_detect(label,"^\\s*$"), "Unkown actor", label)) %>% # There was a blank space
+  left_join(act_class_as, by = c("label" = "label"))
+
+
+## Creating edges based on the encounters between actor1 and actor2
+# Creating a df with the number of encounters between actors
+encoun_vio_as <- ACLED_assoc_df %>%
+  group_by(actor1, actor2) %>% 
+  summarise(weight = n()) %>%
+  ungroup()
+
+# Creating a df of the edges
+edges_as <- encoun_vio_as %>% 
+  left_join(nodes_as, by = c("actor1" = "label")) %>% 
+  rename(group_1 = id)
+
+edges_as <- edges_as %>% 
+  left_join(nodes_as, by = c("actor2" = "label")) %>% 
+  rename(group_2 = id)
+
+edges_as <- select(edges_as, group_1, group_2, weight)
+
+# Since there are events where the same group appears two attack itself (or a coding issue?), I will delete those
+edges_as <- filter(edges_as, !(group_1 == group_2))
+
+# Arranging nodes according to number of encounters
+nodes_as <- nodes_as |> 
+  left_join(edges_as, by=c("id"="group_1")) |> 
+  arrange(desc(weight)) |> 
+  mutate(id = row_number())
+
+# Changing the id to ensure that nodes and edges follow each other
+edges_as <- nodes_as |> 
+  select(id, group_2, weight) |> 
+  rename("group_1" = "id") |> 
+  filter(!(is.na(weight)))
+
+# Selecting relevant varible for the nodes 
+nodes_as <- nodes_as|> 
+  select(c(id, label,inter))
+
+## Time to create network df 
+encounter_AS <- tbl_graph(nodes = nodes_as, edges = edges_as, directed = TRUE)
+encounter_AS <- encounter_AS %>% 
+  mutate(inter = as.factor(inter))
+
+
+### Abbreviation 
+
+encounter_AS <- encounter_AS %>% 
+  activate(nodes) %>%
+  mutate(abb = as.factor(label), 
+         abb = fct_recode(abb, "SNA" = "Military Forces of Somalia (2022-)", 
+                          "Hawadle Clan Militia" = "Hawadle Clan Militia (Somalia)",
+                          "ATMIS Kenya" = "ATMIS: African Union Transition Mission in Somalia (2022-) (Kenya)",
+                          "Federal Police" = "Police Forces of Somalia (2022-)", 
+                          "ATMIS Burundi" = "ATMIS: African Union Transition Mission in Somalia (2022-) (Burundi)",
+                          "Macawiisley militia" = "Macawiisley Clan Militia (Somalia)",
+                          "SNA special forces" = "Military Forces of Somalia (2022-) Special Forces",
+                          "US army" = "Military Forces of the United States (2021-)",
+                          "Kenyan military" = "Military Forces of Kenya (2022-)", 
+                          "Ethiopian military" = "Military Forces of Ethiopia (2018-)",
+                          "Jubaland Security Forces" = "Military Forces of Somalia (2022-) Jubaland Security Force",
+                          "Turkey military forces" = "Military Forces of Turkey (2016-)",
+                          "Jubaland police" = "Police Forces of Somalia (2022-) Jubaland Police Force", 
+                          "Abgal Clan militia" = "Abgal Clan Group (Somalia)",
+                          "ATMIS Djibouti" = "ATMIS: African Union Transition Mission in Somalia (2022-) (Djibouti)",
+                          "Hawadle Yaber Dige Militia" = "Hawadle Yaber Dige Sub-Clan Militia (Somalia)", 
+                          "Galmadug Security forces" = "Military Forces of Somalia (2022-) Galmudug Security Force",
+                          "ATMIS Ethiopia" = "ATMIS: African Union Transition Mission in Somalia (2022-) (Ethiopia)", 
+                          "Abgal Militia" = "Abgal Clan Militia (Somalia)", 
+                          "Habar Gedir Militia" = "Habar Gedir Clan Militia (Somalia)", 
+                          "Rahanweyn Militia" = "Rahanweyn Clan Militia (Somalia)",
+                          "Hawadle-Ibrahim Isse Militia" = "Hawadle-Ibrahim Isse Sub-Clan Militia (Somalia)",
+                          "UAE Military forces" = "Military Forces of the United Arab Emirates (2022-)", 
+                          "ATMIS Uganda" = "ATMIS: African Union Transition Mission in Somalia (2022-) (Uganda)", 
+                          "Ethiopian police" = "Police Forces of Ethiopia (2018-2023) Liyu Police",
+                          "Habar Gedir-Saleban Militia" = "Habar Gedir-Saleban Clan Militia (Somalia)",
+                          "al-Shabaab" = "Al Shabaab"),
+         inter = as.factor(inter), 
+         inter = fct_recode(inter, "State Forces" = "1", "Rebel Group" = "2", "Clan militia" = "4", 
+                            "International actor" = "8")) 
+
+# The palette with black:
+cbbPalette <- c("#CC6666", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#CCFF00FF")
+
+
+as_figt <- ggraph(encounter_AS, layout = "linear") + 
+  geom_edge_arc(aes(width = weight), edge_alpha=0.7, edge_alpha=0.5, fold=T) + 
+  scale_edge_width_continuous(breaks = c(1,5,10,30,100,200,300), range = c(0.2, 6)) +
+  geom_node_point(aes(colour = inter), size = 3) +
+  geom_node_text(aes(label = abb), hjust = 1, nudge_y = -.6, 
+                 angle = 90, size = 3) +
+  labs(colour = "Group category", edge_width = "Number of encounters") +
+  scale_colour_manual(values=cbbPalette) +
+  coord_cartesian(clip = "off") +
+  theme_graph(title_face = "plain", title_size = 22, 
+              plot_margin = margin(0.1,1,1.4,1, "cm")) +
+  theme(legend.position="top", legend.box="vertical") +
+  expand_limits(x = c(-1.4, 1.4), y = c(-8, 1.2)) 
+as_figt
+```
+
+## Where and how al-Shabaab has retaliated
+
+Exploring how AS has retaliated, figure 3 shows the location and the number of casualties of al-Shabaab attacks and bombs in Somalia. The majority of the attacks in the studied period took place in administrative region of Banadir, i.e., Mogadishu (25.8%), Lower Shabelle (25.4%), and lower Juba (12,6%). A common trait found among these events are that they are mostly armed attacks against government forces and civilians. Approximately 15% of all events involving AS were directed against civilians, killing around 730 people. In Mogadishu, al-Shabaab has conducted several hit-and-run attacks against military forces and civilians, and conducted suicide bombings in public places, killing a total of 758 people in the city and surrounding areas. Among these attacks was a major suicide attack close to the Somali ministry of education, killing 121 civilians and injuring 300.\
+A similar pattern also exists in Lower Shabelle and Lower Juba, though with fewer casualties. Although the activity level of al-Shabaab in the Galgaduud and Hiraan regions is lower than that of other regions, 2046 people have been killed by al-Shabaab in these two regions, making it the regions where most people have been killed by al-Shabaab attacks.
+
+```{=html}
+<details>
+<summary>Table 4: al-Shabaab activities per region</summary>
+```
+```{r}
+### Attacks by AS 
+AS_attacks_df <- ACLED_df |>  
+  filter(actor1 == "Al Shabaab") |> 
+  mutate(event_type = as.factor(event_type),
+         event_date_1 = dmy(event_date)) |> 
+  filter(event_date_1 >= "2022-08-01")  |>  
+  filter(event_type != "Strategic developments") |> # Since we are only looking at attacks
+  mutate(event_type = droplevels(event_type))
+
+table_4 <- AS_attacks_df |> 
+  group_by(admin1) |> 
+  summarise(tot_act = n()) |> 
+  arrange(desc(tot_act)) |> 
+  rename("Region" = "admin1", "Number of activities" = "tot_act")
+knitr::kable(table_4)
+```
+
+</details>
+
+```{=html}
+<details>
+<summary>Table 5: al-Shabaab attack fatalities</summary>
+```
+```{r}
+table_5 <- AS_attacks_df |> 
+  group_by(admin1) |> 
+  summarise(tot_fat = sum(fatalities)) |> 
+  arrange(desc(tot_fat)) |> 
+  rename("Region" = "admin1", "Total fatalities" = "tot_fat")
+knitr::kable(table_5)
+```
+
+</details>
+
+```{r}
+#| warning: false
+#| fig-cap: "Figure 3 - Attacks by al-Shabaab"
+AS_attacks_sf <- AS_attacks_df |> 
+  mutate_at(vars(longitude, latitude), as.numeric)  |>    # coordinates must be numeric
+  st_as_sf(                                   # Creating a sf object
+    coords= c("longitude", "latitude"),
+    agr = "constant",
+    crs = st_crs("+proj=longlat +datum=WGS84 +no_defs"), # align coordinate system       
+    stringsAsFactors = FALSE,
+    remove = TRUE
+  )
+
+############################ 
+## Creating the map 
+############################ 
+
+##### Event map 
+#### Attacks carried out by al-Shabaab
+# Take the centroid of each multipolygon in labeled_regions
+labeled_regions_centroid <- st_centroid(somail_reg)
+
+# Convert event_type to factor for proper coloring
+AS_attacks_sf$event_type <- as.factor(AS_attacks_sf$event_type)
+
+# Create a base map
+m <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron")  # You can choose a different tile provider
+
+m <- m |> 
+  addCircleMarkers(data = war_fires_sf,
+                   fillOpacity = 0.65,
+                   radius = 1,
+                   color = "blue",
+                   popup = ~paste("Type: Conflict related fire", "<br> Date: ", date))
+
+# Add circles for AS attacks with popups
+
+pal <- colorFactor(
+  palette = c("#66c2a5", "#fc8d62", "#8da0cb"),
+  domain = AS_attacks_sf$event_type)
+
+m <- m %>%
+  addCircleMarkers(data = AS_attacks_sf, 
+                   color = ~pal(event_type), 
+                   radius = ~sqrt(fatalities) * 1,  # Adjust the multiplier for smaller circles
+                   fillOpacity = 0.65,
+                   popup = ~paste("Type: ", event_type, "<br> Fatalities: ", fatalities, "<br> Date: ", event_date_1))
+
+# Add polygons for administrative regions
+m <- m %>%
+  addPolygons(data = somail_reg, fill=F, color = "black", weight = 0.5, fillOpacity = 0.8)
+
+# Customize the map appearance
+m <- m %>%
+  addLegend(position = "bottomright", 
+            colors = c("#66c2a5", "#fc8d62","#8da0cb", "blue"), 
+            labels = c(levels(AS_attacks_sf$event_type),"Conflict related fires"),
+            opacity = 0.7)
+
+# Display the map
+m
+```
+
+# Territorial control
+
+As highlighted by scholars investigating civil wars it is important to understand which areas are controlled by either rebel forces or the government since it affects the behavior of both parties [@kalyvas2006]. In the case of AS having a larger area means that they can more easily mobilize the needed resources for waging a war, which for example can be done either through taxation of the locale population, or forced conscription of recruits to AS military units.
+
+## Territorial control using a grid of hexagons
+
+Opposite other analyses of territorial control, which view control as a binary phenomenon between being controlled or not controlled, this analysis operationalizes it as a continuous variable. Hereby, territorial control is understood as a spectrum with two extremes; fully controlled by AS or fully controlled by the Somali government. However, control also falls in between the two extremes since territory, to a varying degree, can be controlled by the two actors or be disputed. This approach is advantageous as it enables the analysis to capture the floating character of territorial control in asymmetrical civil wars such as the one in Somalia.\
+To gauge territorial control the analysis follows Theresa Anders' approach, where territorial control is firstly operationalised using a hexagonal grid as the spatial unit of interest, where each hexagonal cell spans 0.20 decimal degrees [@anders2020]. Using these spatial units instead of administrative regions allows the analysis to assess territorial control independently of administrative borders.\
+Secondly, in order to assess territorial control of a grid cell I apply the following three data sources: **1)** Maps of AS-controlled areas in Somalia for August 2022 and September 2022 provided by the Critical Threats Project [@karr] to gauge which hexagons are *i)* fully controlled by AS, *ii)* partly controlled by AS, and *iii)* are AS attacks zones. **2)** Using a specialized coding scheme each recorded event in the ACLED data set is assigned a unique numerical value depending on the nature of a control-related event and whether it was AS, government forces, or other domestic and international government allies of the government who performed the action. Lower values are associated with AS control whereas higher values with Somali government control. **3)** Lastly, the location and time of conflict-related fires are also applied as an indicator of armed attacks, and thereby a sign that an area is contested.\
+The events are then aggregated to the hexagonal cells on a monthly time frame. Territorial control of a grid cell is thus assigned based on the occurrence of a specific event within a cell. New events cause a cell to update the coded level of territorial control based on the event type. In the case of multiple events occurring in the same grid cell month, the analysis averages across them. Cells with no events in a given month are imputed to mirror the control value of the cell in the previous month.\
+
+The final result of the above approach is shown in figure 4 below for southern and central Somalia. This part of Somalia is chosen since it is in these areas that that al-Shabaab controls territory, and figure 1 indicates that the fight against al-Shabaab has for the most part been taking part in these areas.\
+What becomes evident is that al-Shabaab control has only been significantly reduced in the central regions of Hiiran, Middle Shebelle, and Galgaadud, whereas the group's control of the southern regions has not changed significantly. This lack of the Somali forces' ability to capture land in the southern part of the country could be an indicator of the governments' inability to persuade locale clans to take up arms against al-Shabaab.\
+It also becomes clear that no major changes in territorial control have happen since August of 2023, a sign of the second phase of the offensive has stalled.
+
+```{r}
+#| warning: false
+#| output: false
+###############################
+######## Preparing data for    
+######## territorial map 
+###############################
+library(data.table)
+library(wesanderson)
+library(ggrepel)
+
+##########
+## Loading assesed areas
+##########
+as_area_ass <- readRDS("source-data/as_assesed_area/as_area_ass.rds")
+
+##########
+## Loading ACLED data
+##########
+##################### Creation of territorial control data
+### Creating spatial object for events
+ACLED_sf <- ACLED_df |> 
+  filter(!is.na(ACLED_df$control)) |> 
+  mutate(event_date_1 = dmy(event_date), 
+         month_date = month(event_date_1),
+         year_month = paste0(as.character(year),"-",as.character(month_date))) |> 
+  mutate_at(vars(longitude, latitude), as.numeric) |>   # coordinates must be numeric
+  st_as_sf(                                   # Creating a sf object
+    coords= c("longitude", "latitude"),
+    agr = "constant",
+    crs = st_crs(as_area_ass),        
+    stringsAsFactors = FALSE,
+    remove = TRUE
+  ) |> 
+  select(-c(iso,event_id_cnty, source, source_scale))
+
+###############
+## Loading    
+## Somalia regional data 
+################
+
+# Setting crs
+somail_reg <- st_transform(somail_reg, st_crs(as_area_ass))
+
+## Selecting regions for territorial analysis 
+somail_reg_subset <-  somail_reg |> 
+  filter(admin1Name %in% c("Mudug", "Galgaduud", "Hiraan", "Middle Shabelle", "Banadir", 
+                           "Lower Shabelle", "Middle Juba", "Lower Juba", "Bay", "Gedo", "Bakool")) |> 
+  st_union()
+
+###############
+## Creating   
+## hex-grid 
+################
+somail_reg_grid <- somail_reg_subset |> 
+  st_make_grid(cellsize = .20, square = FALSE) |> # grid of hexagonal cells
+  st_intersection(somail_reg_subset) |> 
+  st_as_sf()
+
+# Removing non-polygon geometries
+geometry_types <- st_geometry_type(somail_reg_grid)
+
+somail_reg_grid <- somail_reg_grid[geometry_types == "POLYGON" | geometry_types == "MULTIPOLYGON", ]
+
+# Adding identifiers 
+somail_reg_grid <- somail_reg_grid |> 
+  mutate(row_n = row_number(),
+         gid = str_c("somhex", row_n))
+
+somail_reg_grid$geom_type <- st_geometry_type(somail_reg_grid)
+
+###############################
+######## Combining data sources   
+######## to create territorial assessment grid
+###############################
+
+## empty list 
+list_df <- list()
+
+for (year_m in rev(unique(ACLED_sf$year_month))) {
+  print(paste0("control in ", year_m))
+  
+  if (year_m %in% c("2022-8", "2022-9")) {
+    print("With static AS control area")
+    
+    ## Critical threats assessment
+    as_control_ass <- as_area_ass |> 
+      filter(year_month == year_m) |> 
+      group_by(as.factor(control)) |> 
+      summarise(geoms = st_combine(geoms))
+  
+    as_control <- st_intersects(st_make_valid(as_control_ass), somail_reg_grid)
+
+    intersects_data <- as.data.frame(as_control)
+    intersects_data <- intersects_data |> 
+      mutate(control = case_when(
+        row.id == 1 ~ 0, 
+        row.id == 2 ~ 0.25,
+        row.id == 3 ~ 0.5
+      )) |> 
+      select(-row.id) 
+    
+    intersects_data <- intersects_data |> 
+      group_by(col.id) |> 
+      slice(which.max(control))
+    
+    somail_grid_ass <- somail_reg_grid |> 
+      left_join(intersects_data, join_by(row_n == col.id)) |> 
+      mutate(control = if_else(is.na(control),1, control)) |> 
+      as_tibble() |> 
+      select(-x)
+    
+    ## Fire data
+    fire_YM <- war_fires_sf |> 
+      filter(year_month == year_m)
+    
+    print(paste0("Number of war fires: ", nrow(fire_YM)))
+    
+    
+    if(nrow(fire_YM)!=0){
+      print("Including fire")
+      fire_month <- fire_YM |> 
+        st_join(somail_reg_grid, join = st_within) |> 
+        as_tibble() |> 
+        select(-c(geometry, map_col, war_fire_restrictive))
+    }
+    
+    
+    ## ACLED data
+    ACLED_YM <- ACLED_sf |> 
+      filter(year_month == year_m)
+    
+    event_in_month <- ACLED_YM |> 
+      st_join(somail_reg_grid, join = st_within) |>
+      bind_rows(somail_grid_ass) |> 
+      bind_rows(fire_month) |> 
+      group_by(gid) |> 
+      summarise(control_avg = mean(control)) |> 
+      as_tibble() |> 
+      select(-geometry)
+    
+    somali_hex_control_m <- somail_reg_grid |> 
+      left_join(event_in_month, by = c("gid" = "gid")) |> 
+      mutate(year_month = year_m)
+    
+    list_df[[(length(list_df) + 1)]] <- somali_hex_control_m
+    
+  } else {
+    print("No static AS area")
+    ## Fire data
+    fire_YM <- war_fires_sf |> 
+      filter(year_month == year_m)
+    
+    print(paste0("Number of war fires: ",nrow(fire_YM)))
+    
+    if(nrow(fire_YM)!=0){
+      print("Including fire")
+      fire_month <- fire_YM |> 
+        st_join(somail_reg_grid, join = st_within) |> 
+        as_tibble() |> 
+        select(-c(geometry, map_col, war_fire_restrictive))
+    }
+    
+    
+    ## ACLED data
+    ACLED_YM <- ACLED_sf |> 
+      filter(year_month == year_m)
+    
+    event_in_month <- ACLED_YM |> 
+      st_join(somail_reg_grid, join = st_within)  |>  
+      bind_rows(fire_month) |> 
+      group_by(gid) |>  
+      summarise(control_avg = mean(control)) |> 
+      as_tibble() |> 
+      select(-geometry)
+    
+    somali_hex_control_m <- somail_reg_grid |> 
+      left_join(event_in_month, by = c("gid" = "gid")) |> 
+      mutate(year_month = year_m)
+    
+    list_df[[(length(list_df) + 1)]] <- somali_hex_control_m
+  }
+  
+}
+
+somali_hex_control <- list_df |> 
+  rbindlist(fill = TRUE)  |> 
+  st_as_sf() |> 
+  arrange(gid)
+
+```
+
+```{r}
+#| warning: false
+#| fig-cap: "Figure 4 - Territorial control using hex-grid"
+#| fig-height: 10.5
+#| fig-width: 9 
+
+##############
+### Creating 13-month lag window and creating plot 
+##############
+# 13 month window 
+somali_hex_control_13 <- somali_hex_control %>% 
+  group_by(gid) %>% 
+  mutate(lag_ctr1 = lag(control_avg, n = 1),
+         lag_ctr2 = lag(control_avg, n = 2),
+         lag_ctr3 = lag(control_avg, n = 3),
+         lag_ctr4 = lag(control_avg, n = 4),
+         lag_ctr5 = lag(control_avg, n = 5),
+         lag_ctr6 = lag(control_avg, n = 6),
+         lag_ctr7 = lag(control_avg, n = 7),
+         lag_ctr8 = lag(control_avg, n = 8),
+         lag_ctr9 = lag(control_avg, n = 9),
+         lag_ctr10 = lag(control_avg, n = 10),
+         lag_ctr11 = lag(control_avg, n = 11),
+         lag_ctr12 = lag(control_avg, n = 12),
+         lag_ctr13 = lag(control_avg, n = 13),
+         control_bef = control_avg) %>%
+  rowwise() %>% 
+  mutate(control_avg = case_when(
+    !is.na(control_avg) ~ control_avg,
+    is.na(control_avg) & !is.na(lag_ctr1) ~ lag_ctr1,
+    is.na(control_avg) & is.na(lag_ctr1) & !is.na(lag_ctr2) ~ lag_ctr2,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & !is.na(lag_ctr3) ~ lag_ctr3,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & !is.na(lag_ctr4) ~ lag_ctr4,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & !is.na(lag_ctr5) ~ lag_ctr5,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & !is.na(lag_ctr6) ~ lag_ctr6,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & !is.na(lag_ctr7) ~ lag_ctr7,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & !is.na(lag_ctr8) ~ lag_ctr8,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & !is.na(lag_ctr9) ~ lag_ctr9,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & is.na(lag_ctr9) & !is.na(lag_ctr10) ~ lag_ctr10,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & is.na(lag_ctr9) & is.na(lag_ctr10) & !is.na(lag_ctr11) ~ lag_ctr11,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & is.na(lag_ctr9) & is.na(lag_ctr10) & is.na(lag_ctr11) & !is.na(lag_ctr12) ~ lag_ctr12,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & is.na(lag_ctr9) & is.na(lag_ctr10) & is.na(lag_ctr11) & is.na(lag_ctr12) & !is.na(lag_ctr13) ~ lag_ctr13,
+    is.na(control_avg) & is.na(lag_ctr1) & is.na(lag_ctr2) & is.na(lag_ctr3) & is.na(lag_ctr4) & is.na(lag_ctr5) & is.na(lag_ctr6) & is.na(lag_ctr7) & is.na(lag_ctr8) & is.na(lag_ctr9) & is.na(lag_ctr10) & is.na(lag_ctr11) & is.na(lag_ctr12) & is.na(lag_ctr13) ~ 1
+  )) %>% 
+  ungroup()
+
+#############
+### Plotting 
+#############
+somali_control_22_23_13 <- somali_hex_control_13 |> 
+  mutate(year_month = as.factor(year_month),
+         year_dt = lubridate::year(ym(year_month)),
+         month_dt = lubridate::month(ym(year_month), label = TRUE, abbr = T),
+         year_month_dt = factor(str_c(month_dt,"-",year_dt)),
+         year_month_dt = fct_relevel(year_month_dt, c("Aug-2022", "Sep-2022",
+                                                       "Oct-2022", "Nov-2022",
+                                                       "Dec-2022", "Jan-2023", 
+                                                       "Feb-2023", "Mar-2023",
+                                                       "Apr-2023", "May-2023",
+                                                       "Jun-2023", "Jul-2023",
+                                                       "Aug-2023", "Sep-2023",
+                                                       "Oct-2023")))
+
+rm(somali_hex_control_13)
+# Creating colors for plot 
+
+mycols <- rev(c("#2c7bb6", #Blue
+                "#abd9e9",
+                "#ffffbf", # Yellow
+                "#fdae61",
+                "#d7191c")) # Red
+
+names(mycols) <- levels(somali_control_22_23_13$control_avg)
+
+
+## Territorial control 
+somali_control <- ggplot() + 
+  geom_sf(data = somail_reg_subset, color = "black", size = 0.5, fill = NA) +
+  geom_sf(data = somali_control_22_23_13, aes(fill = control_avg), alpha = 0.7, size = 0.01, color = "lightgrey") +
+  facet_wrap(~year_month_dt, nrow = 4) +
+  scale_fill_gradientn(name = "",
+                       colors = mycols,
+                       breaks = c(0, 0.5, 1),
+                       limits = c(0,1),
+                       labels = c("al-Shabaab\ncontrol",
+                                  "Highly\ncontested area",
+                                  "Government\ncontrol")) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(5,5,2,2),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.box.background = element_blank(),
+        legend.key.width = unit(2, "cm")) +
+  coord_sf(datum = NA)
+
+somali_control
+
+```
+
+### Interpolating territorial control
+
+Despite the above advantages of applying a grid to assess territorial control, it falls short of taking into account that territorial control seldom follows the shape of a hexagonal cell and how possible predictors influence territorial control in an area. One could for instance think that the state's ability to project power and hence control of an area is conditioned on its ability to transport military personnel and equipment to areas within its borders [@scott1999]. To make up for these disadvantages the analysis, besides the monthly grid of territorial control, also uses a spatial interpolation method called Kriging in order to estimate territorial control in Somalia. This geostatistical method uses a limited set of sampled data points to estimate the value of a variable, in our case territorial control, over a continuous spatial field [@gräler2016].\
+I will briefly describe my approach: First, a 1 x 1-km raster grid of Southern and Central Somalia is created, where each grid cell contains the following information: *i)* average transportation time from regional capitals to the grid cell as a measure of state reach [@müller-crepon2021], *ii)* population density [@worldpop], and *iii)* nighttime lights intensity as a proxy for economic development [@elvidge2017]. Hereafter, I extract one point from each hexagon cell in the monthly grid of territorial control described earlier (figure 4) together with the corresponding territorial control value from the cell in question. The centroid of each hexagon is chosen as the point being extracted. This is followed by universal kriging interpolation that uses the location of each point, the corresponding territorial control value, state reach, population density, and nighttime lights, in order to estimate territorial control for each 1 x 1-km grid cell. Thus, achieving a more fine grained assessment where the effect of a pre-defined spatial shape does not affect the final assessment and covariates of interest affecting control are moreover included.\
+However, this approach comes with a caveat. By using the centroid of each hexagon-cell as the foundation for conducting kriging interpolation we lose spatial accuracy since the point sampled does not reflect the location of the ACLED events and conflict related fires. Though in especially the case where also polygons of al-Shabbab control and attack areas are included in the model, it is necessary to convert the polygons into points, which when compared with the chosen method has the effect that the importance of ACLED events and conflict-related fires are downplayed, thus leading to a misrepresentation of territorial control. This comparative analysis of the two approaches can be attached if needed. Moreover, using the hexagonal-grid ensures that the assessment of areas where no events have occurred in a given month are still included in the analysis due to the hexagonal-grid's use of past value when inferring the current state of a cell if nothing has happened.\
+The above process is computationally heavy, and because of that I have only performed kriging interpolation for October 2023, i.e., the last month of the studied period. Figure 5 depicts the results using a continuous measure (press drop down arrow to view), whereas the same measurement has been turned into a discrete measure in figure 6 in order to ease interpretation.
+
+```{=html}
+<details>
+<summary>Code for univeral kriging interpolation </summary>
+```
+```{r}
+#| eval: false
+###############################
+######## Preparing data for    
+######## kriging interpolatation
+###############################
+
+######### Getting rasta data 
+library(terra)
+library(stars)
+
+## Reading night light emission  
+night_light <- rast("source-data/nightlights-2018/Harmonized_DN_NTL_2018_simVIIRS.tif")
+night_light <- crop(night_light, vect(st_transform(somail_reg_subset, crs = st_crs(night_light))))
+plot(night_light)
+
+## Reading population density
+pop_dense <- rast("source-data/worldpop/SOM_pph_2020_adj_v2.tif")
+pop_dense <- crop(pop_dense, vect(st_transform(somail_reg_subset, crs = st_crs(pop_dense))), "out")
+plot(pop_dense)
+
+## Reading state reach data regional capitals
+state_reach <- rast("source-data/state_reach/time2regcap_1945_2016_dynroads.tif")
+state_reach <- state_reach$time2regcap_1945_2016_dynroads_72
+state_reach <- crop(state_reach, vect(st_transform(somail_reg_subset, crs = st_crs(state_reach))), "out")
+plot(state_reach)
+
+
+## resampling
+# night light
+resampled_night_light <- project(night_light, crs(pop_dense))
+resampled_night_light <- resample(x = resampled_night_light, y = pop_dense)
+
+# state reach 
+resampled_state_reach <- project(state_reach, crs(pop_dense))
+resampled_state_reach <- resample(x = resampled_state_reach, y = pop_dense)
+
+### Creating new rasta 
+grid_cov <- rast(list(pop_dense, resampled_night_light, resampled_state_reach))
+names(grid_cov) <- c("pop_dense", "night_light", "state_reach")
+
+writeRaster(grid_cov, "output-data/grid_cov/grid_cov.tif", 
+            filetype = "GTiff", overwrite = TRUE)
+
+rm(night_light)
+rm(resampled_night_light)
+rm(state_reach)
+rm(resampled_state_reach)
+rm(grid_cov)
+
+#### Loading hexagonal data
+library(stars)
+
+pop_dense <- read_stars("source-data/worldpop/SOM_pph_2020_adj_v2.tif")
+
+somali_hex_time <- somali_control_22_23_13
+
+somali_hex_time <- st_transform(somali_hex_time, crs = st_crs(pop_dense))
+
+somali_hex_time_centroid <- somali_hex_time |>  
+  st_centroid() 
+
+somali_hex_time_centroid <- somali_hex_time_centroid |> 
+  mutate(date_ym = ym(year_month, tz = "UTC")) |> 
+  arrange(date_ym, row_n) |> 
+  select(-c("lag_ctr1", "lag_ctr2", "lag_ctr3", "lag_ctr4", "lag_ctr5", "lag_ctr6", "lag_ctr7", "lag_ctr8",   
+            "lag_ctr9", "lag_ctr10", "lag_ctr11", "lag_ctr12", "lag_ctr13", "control_bef", "geom_type",
+            "row_n"))
+
+###### Loading rasta data 
+########### 
+grid_cov <- rast("output-data/grid_cov/grid_cov.tif")
+grid_cov <- terra::aggregate(grid_cov, 10)
+
+rast_list <- split(grid_cov, 1:nlyr(grid_cov)) |>
+  `names<-`(names(grid_cov))
+
+pop_dense <- stars::st_as_stars(rast(rast_list[1]))
+pop_dense[is.na(pop_dense)] <- 0
+pop_dense <- st_crop(pop_dense, st_transform(somail_reg_subset, crs = st_crs(pop_dense)), crop = T)
+
+night_light <- stars::st_as_stars(rast(rast_list[2]))
+night_light[is.na(night_light)] <- 0
+night_light <- st_crop(night_light, st_transform(somail_reg_subset, crs = st_crs(pop_dense)), crop = T)
+
+state_reach <- stars::st_as_stars(rast(rast_list[3]))
+state_reach[is.na(state_reach)] <- 0
+state_reach <- st_crop(state_reach, st_transform(somail_reg_subset, crs = st_crs(pop_dense)), crop = T)
+
+rast_combi <- c(pop_dense,night_light,state_reach)
+
+somali_hex_time_centroid <- st_transform(somali_hex_time_centroid, crs = st_crs(rast_combi))
+extract_val <- st_extract(rast_combi, somali_hex_time_centroid)
+
+somali_hex_time_centroid$pop_dense <- extract_val$pop_dense
+somali_hex_time_centroid$night_light <- extract_val$night_light
+somali_hex_time_centroid$state_reach <- extract_val$state_reach
+
+##################
+######## Universal kriging on a continuous scale 
+##################
+
+somali_hex_time_centroid <- somali_hex_time_centroid |> 
+  mutate(pop_dense = if_else(is.na(pop_dense),0,pop_dense),
+         night_light = if_else(is.na(night_light),0, night_light),
+         state_reach = if_else(is.na(state_reach),mean(state_reach, na.rm=T), state_reach))
+
+
+kriging_result.10 = automap::autoKrige(control_avg ~ pop_dense +
+                                        night_light + 
+                                        state_reach, 
+                                      input_data = somali_hex_time_centroid[somali_hex_time_centroid$date_ym == as.Date("2023-10-01"),], 
+                                      new_data = rast_combi)
+
+```
+
+</details>
+
+```{=html}
+<details>
+<summary>Figure 5</summary>
+```
+```{r}
+#| warning: false
+#| echo: false
+#| fig-cap: "Figure 5 - Territorial control using kriging interpolation on a continuous scale - October 2023"
+library(ggrepel)
+library(ggtext)
+
+## Loading terr. Continuous ctrl. raster 
+terr_ctrl_cont <-  read_stars("output-data/grid_terr/terr_10_2023.tif")
+terr_ctrl_cont <- terr_ctrl_cont |> 
+  rename(terr_ctrl = terr_10_2023.tif)
+
+# Define the target CRS for long-lat (EPSG:4326)
+target_crs <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
+
+# Transform the data to long-lat
+terr_ctrl_cont <- st_transform(terr_ctrl_cont, crs = target_crs)
+somail_reg <- st_transform(somail_reg, crs = target_crs)
+somali_cap <- st_transform(somali_cap, crs=target_crs)
+national_cap <- st_transform(national_cap, crs = target_crs)
+
+##### Continuous map of territorial control
+mycols <- rev(c("#2c7bb6", #Blue
+                "#abd9e9",
+                "#ffffbf", # Yellow
+                "#fdae61",
+                "#d7191c")) # Red
+
+names(mycols) <- levels(terr_ctrl_cont$terr_ctrl)
+
+cont_terr_ctrl <- ggplot() +
+  geom_stars(data = terr_ctrl_cont, aes(fill = terr_ctrl)) +
+  scale_fill_gradientn(name = "",
+                       colors = mycols,
+                       breaks = c(0, 0.5, 1),
+                       limits = c(0,1),
+                       labels = c("al-Shabaab\ncontrol",
+                                  "Highly\ncontested area",
+                                  "Government\ncontrol")) +
+  geom_sf(data = st_cast(somail_reg_subset, "MULTILINESTRING")) + 
+  geom_sf(data = st_cast(somail_reg, "MULTILINESTRING"), alpha = .3) + 
+  geom_sf(data = somali_cap, shape = 15, size = 2.5) + 
+  geom_sf(data = national_cap, shape = 15, size = 5)+ 
+  geom_sf(data = somali_cap, shape = 15, size = 2.5) + 
+  geom_sf(data = national_cap, aes(color = as.factor(NAME)), shape = 15, size = 5) +
+  scale_colour_manual(values = "black", 
+                      name = "National and regional capitals", 
+                      labels = "")  +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(5,5,2,2),
+        legend.box.background = element_blank(),
+        legend.key.width = unit(2, "cm"),
+        legend.box="vertical") +
+  xlab("") + ylab("")
+cont_terr_ctrl
+
+```
+
+</details>
+
+```{r}
+#| warning: false
+#| fig-cap: "Figure 6 - Territorial control using kriging interpolation on a discrete scale - October 2023"
+############################ 
+## Creating the map 
+############################ 
+## Loading terr. cat. discrete polygon
+terr_ctrl <- st_read("output-data/polygons/10-2023-terr-ctrl.shp", quiet = TRUE)
+
+terr_ctrl <- terr_ctrl |> 
+  rename(terr_ctrl = vr_prd_) |> 
+  mutate(terr_ctrl = fct_relevel(terr_ctrl, c("AS controlled", "AS partly controlled", 
+                           "Contested area", "Gov partly controlled", 
+                           "Gov controlled")),
+         terr_ctrl = fct_recode(terr_ctrl, "al-Shabaab controlled" = "AS controlled",
+                                "al-Shabaab partly controlled"="AS partly controlled",
+                                "Government partly controlled"="Gov partly controlled",
+                                "Government controlled"="Gov controlled"))
+         
+
+# Define the target CRS for long-lat (EPSG:4326)
+target_crs <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
+
+# Transform the data to long-lat
+terr_ctrl <- st_transform(terr_ctrl, crs = target_crs)
+somail_reg <- st_transform(somail_reg, crs = target_crs)
+
+##### Territorial control map 
+#### Attacks carried out by al-Shabaab
+# Take the centroid of each multipolygon in labeled_regions
+labeled_regions_centroid <- st_centroid(somail_reg)
+
+# Create a base map
+m <- leaflet() |> 
+  addProviderTiles("CartoDB.Positron")  
+
+pal <- colorFactor(
+  palette = c("#d7191c", "#fdae61", "#ffffbf", "#abd9e9","#2c7bb6"),
+  domain = terr_ctrl$terr_ctrl)
+
+
+m <- m |> 
+  addPolygons(data = terr_ctrl, weight = 1, smoothFactor = 0.5,
+    opacity = 1.0, fillOpacity = 0.5,
+    fillColor = ~pal(terr_ctrl),
+    highlightOptions = highlightOptions(color = "white", weight = 2,
+      bringToFront = TRUE),
+    label = ~paste("Control: ", terr_ctrl))
+  
+
+# Add polygons for administrative regions
+m <- m |> 
+  addPolygons(data = somail_reg, fill=F, color = "black", weight = 0.5, fillOpacity = 0.8)
+
+# Customize the map appearance
+m <- m %>%
+  addLegend(position = "bottomright", 
+            colors = c("#d7191c", "#fdae61", "#ffffbf", "#abd9e9","#2c7bb6"), 
+            labels = c("al-Shabaab controlled", "al-Shabaab partly controlled", "Contested area", "Government partly controlled", "Government controlled"),
+            opacity = 0.7)
+
+# Display the map
+m
+```
