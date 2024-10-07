@@ -1,5 +1,5 @@
 ---
-title: "Who Am I?"
+title: "who am I?"
 ---
 *A page dedicated to exploring my professional journey in data science and political science, and what I’m up to when I’m not diving into data.*
 

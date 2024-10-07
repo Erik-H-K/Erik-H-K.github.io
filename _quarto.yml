@@ -4,6 +4,7 @@ project:
 
 website:
   title: "Erik H. K"
+  site-url: https://ErikHK.github.io/
   navbar:
     left:
       - href: index.qmd
