@@ -1,0 +1,526 @@
+---
+title: "Mali violent interaction graph"
+description: Currently I am wokring on getting to know the graph database NEO4J and it's CYPHER database language. 
+author: "Erik H. K"
+date: 10-20-2024
+categories: [Python, Network, Cypher, NEO4J]
+draft: false 
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+jupyter: python3
+image: network.png
+---
+
+```{r}
+#| echo: false
+Sys.setenv(RETICULATE_PYTHON = "/opt/miniconda3/bin/python")
+library(reticulate)
+use_python("/opt/miniconda3/bin/python")
+```
+
+```{python}
+#| echo: false 
+# Replace with your actual Aura connection URI
+URI = "neo4j+s://f27ee2b3.databases.neo4j.io"
+
+# Replace with your Aura username and password
+AUTH = ("neo4j", "djOJn_pz1-7l0OSV_UBctVAJXZm_fQ5X5KKbX-hG1Eo")
+```
+
+# The Aim 
+I will in this blog post try to make an interactive graph of violent encounters in Mali betweem different actors using data from the ACLED project and a NEO4J graph database. 
+
+## Setting up my environment
+
+```{python}
+from datetime import datetime
+from neo4j import GraphDatabase
+import pandas as pd
+import numpy as np
+```
+
+## Testing the NEO4J database
+```{python}
+#| eval: false
+def run_query(query, parameters=None):
+    with GraphDatabase.driver(URI, auth=AUTH) as driver:
+        with driver.session() as session:
+            result = session.run(query, parameters)
+            return [record for record in result]
+
+```
+
+
+```{python}
+#| eval: false
+# Test the connection
+test_query = "RETURN 'Connection successful' AS message"
+result = run_query(test_query)
+print(result[0]['message'])
+```
+
+## ACLED data 
+Importing the ACLED data from a csv and only selecting data from 2024.  
+```{python}
+#| eval: false
+mali_acled = pd.read_csv("/Users/erikh.knudsen/Documents/Russian_in_Africa/mali_full_ACLED_2021-01-01<->2024-08-31.csv")
+mali24 = mali_acled[mali_acled["year"]==2024]
+```
+
+I will now create a data frame for the nodes
+
+```{python}
+#| eval: false
+neo4j_nodes = pd.DataFrame({
+    'Actor': pd.concat([mali24['actor1'], mali24['actor2']]),
+    'Actor category': pd.concat([mali24['inter1'], mali24['inter2']])
+})
+
+# Handle cases where 'assoc_actor_1' or 'assoc_actor_2' may be the same as 'actor1' or 'actor2'
+for index, row in mali24.iterrows():
+    if pd.notna(row['assoc_actor_1']) and row['assoc_actor_1'] == row['actor1']:
+        neo4j_nodes = neo4j_nodes.append({'Actor': row['assoc_actor_1'], 'Actor category': row['inter1']}, ignore_index=True)
+    if pd.notna(row['assoc_actor_2']) and row['assoc_actor_2'] == row['actor2']:
+        neo4j_nodes = neo4j_nodes.append({'Actor': row['assoc_actor_2'], 'Actor category': row['inter2']}, ignore_index=True)
+
+# Drop any rows with missing values, reset the index, and extract unique entries from the final DataFrame for Neo4j nodes
+neo4j_nodes = neo4j_nodes.dropna().reset_index(drop=True)
+distinct_neo4j_nodes = neo4j_nodes.drop_duplicates().reset_index(drop=True)
+
+actor_category_map = {
+    1: "State forces",
+    2: "Rebel groups",
+    3: "Political militias",
+    4: "Identity militias",
+    5: "Rioters",
+    6: "Protesters",
+    7: "Civilians",
+    8: "External/other forces"
+}
+
+# Apply the mapping to the 'Actor category' column
+distinct_neo4j_nodes['Actor category'] = distinct_neo4j_nodes['Actor category'].map(actor_category_map)
+
+distinct_neo4j_nodes
+```
+This data frame will  in the following code be imported into my NEO4J database: 
+```{python}
+#| eval: false
+
+def create_event_relationships_tx(tx, data):
+    actor1 = data.get('actor1')
+    actor2 = data.get('actor2')
+    assoc_actor_1 = data.get('assoc_actor_1')
+    assoc_actor_2 = data.get('assoc_actor_2')
+    event_type = data.get('event_type')
+
+    if not actor1 or not actor2 or not event_type:
+        raise ValueError(f"Missing required data: actor1={actor1}, actor2={actor2}, event_type={event_type}")
+
+    query = """
+    MATCH (a1:Actor {name: $actor1}),
+          (a2:Actor {name: $actor2})
+    MERGE (a1)-[r:`{event_type}`]->(a2)
+    SET r.event_date = datetime($event_date),
+        r.month = $month,
+        r.fatalities = $fatalities,
+        r.latitude = $latitude,
+        r.longitude = $longitude
+    RETURN a1.name AS actor1, a2.name AS actor2, type(r) AS relationship_type
+    """
+
+    results = []
+
+    def run_query(actor1, actor2):
+        if actor1 and actor2:
+            result = tx.run(query.format(event_type=event_type), 
+                            actor1=actor1,
+                            actor2=actor2,
+                            event_date=data['event_date'],
+                            month=data['month'],
+                            fatalities=data['fatalities'],
+                            latitude=data['latitude'],
+                            longitude=data['longitude'])
+            return result.single()
+        return None
+
+    results.append(run_query(actor1, actor2))
+    results.append(run_query(actor1, assoc_actor_2))
+    results.append(run_query(assoc_actor_1, actor2))
+    results.append(run_query(assoc_actor_1, assoc_actor_2))
+
+    return [result for result in results if result]
+
+def main():
+    with GraphDatabase.driver(URI, auth=AUTH) as driver:
+        with driver.session(database="neo4j") as session:
+            for index, row in mali24.iterrows():
+                mali24_row = row.to_dict()
+                try:
+                    results = session.execute_write(create_event_relationships_tx, mali24_row)
+                    for result in results:
+                        print(f"Created relationship: {result}")
+                except Exception as e:
+                    print(f"Error processing row {index}:")
+                    print(f"  Data: {mali24_row}")
+                    print(f"  Error: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+```
+### Importing relationships/edges 
+Here the relationships/edges are imported into NEO4J. But I will fest need to do some data cleaning. 
+```{python}
+#| eval: false
+import re
+mali24.loc[:, "event_date"] = pd.to_datetime(mali24["event_date"], format="%Y-%m-%d")
+mali24.loc[:,"month"] = mali24["event_date"].dt.month
+
+mali24['event_type'] = mali24['event_type'].apply(lambda x: re.sub(r'[^A-Za-z0-9]+', '_', str(x)).upper())
+```
+I will now write data to neo4J server: 
+```{python}
+#| eval: false
+from datetime import datetime
+import numpy as np
+
+URI = "neo4j+s://f27ee2b3.databases.neo4j.io"
+
+# Replace with your Aura username and password
+AUTH = ("neo4j", "djOJn_pz1-7l0OSV_UBctVAJXZm_fQ5X5KKbX-hG1Eo")
+
+def create_event_relationships_tx(tx, data):
+    actor1 = data.get('actor1')
+    actor2 = data.get('actor2')
+    assoc_actor_1 = data.get('assoc_actor_1') if pd.notna(data.get('assoc_actor_1')) else None
+    assoc_actor_2 = data.get('assoc_actor_2') if pd.notna(data.get('assoc_actor_2')) else None
+    event_type = data.get('event_type')
+
+    if not actor1 or not actor2 or not event_type:
+        raise ValueError(f"Missing required data: actor1={actor1}, actor2={actor2}, event_type={event_type}")
+
+    query = """
+    MERGE (a1:Actor {name: $actor1})
+    MERGE (a2:Actor {name: $actor2})
+    MERGE (a1)-[r:%s]->(a2)
+    SET r.event_date = datetime($event_date),
+        r.month = $month,
+        r.fatalities = $fatalities,
+        r.latitude = $latitude,
+        r.longitude = $longitude
+    RETURN a1.name AS actor1, a2.name AS actor2, type(r) AS relationship_type
+    """ % event_type  # directly concatenate the relationship type
+
+    results = []
+
+    def run_query(actor1, actor2):
+        if actor1 and actor2:
+            result = tx.run(query, 
+                            actor1=actor1,
+                            actor2=actor2,
+                            event_date=data['event_date'],
+                            month=data['month'],
+                            fatalities=data['fatalities'],
+                            latitude=data['latitude'],
+                            longitude=data['longitude'])
+            return result.single()
+        return None
+
+    # Create relationships for all possible actor combinations
+    results.append(run_query(actor1, actor2))
+    if assoc_actor_2: results.append(run_query(actor1, assoc_actor_2))
+    if assoc_actor_1: results.append(run_query(assoc_actor_1, actor2))
+    if assoc_actor_1 and assoc_actor_2: results.append(run_query(assoc_actor_1, assoc_actor_2))
+
+    return [result for result in results if result]
+
+def main():
+    with GraphDatabase.driver(URI, auth=AUTH) as driver:
+        with driver.session(database="neo4j") as session:
+            for index, row in mali24.iterrows():
+                mali24_row = row.to_dict()
+                try:
+                    results = session.execute_write(create_event_relationships_tx, mali24_row)
+                    for result in results:
+                        print(f"Created relationship: {result}")
+                except Exception as e:
+                    print(f"Error processing row {index}: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+
+```
+
+## Creating the graph 
+###  Extract data from neo4j
+In this code I will extract relational data from the NEO4J database that we imported before. 
+```{python}
+
+# Connect to Neo4j
+uri = "neo4j+s://f27ee2b3.databases.neo4j.io"  
+driver = GraphDatabase.driver(uri, auth=("neo4j", "djOJn_pz1-7l0OSV_UBctVAJXZm_fQ5X5KKbX-hG1Eo"))
+
+def get_actor_relationships(tx, month=None, relationship=None):
+    query = """
+    MATCH (a:Actor)-[r]->(b:Actor)
+    WHERE (r.month = $month OR $month IS NULL)
+    AND (type(r) = $relationship OR $relationship IS NULL)
+    RETURN 
+        a.name AS source, 
+        b.name AS target, 
+        type(r) AS relationship, 
+        a.category AS source_category, 
+        b.category AS target_category, 
+        r.month AS month, 
+        date(r.event_date) AS event_date, 
+        r.fatalities AS fatalities, 
+        r.latitude AS latitude, 
+        r.longitude AS longitude
+    """
+    return list(tx.run(query, month=month, relationship=relationship))
+
+with driver.session() as session:
+    actor_relationships = session.read_transaction(get_actor_relationships)
+
+
+```
+Hereafter the data is now turned into a pandas data frame and converted to a networkx graph object. 
+```{python}
+import networkx as nx
+import pandas as pd
+
+
+# Load data into a DataFrame
+df = pd.DataFrame(actor_relationships, columns=["source", "target", "relationship", "source_category", "target_category", "month", "event_date", "fatalities", "latitude", "longitude"])
+
+# Create the graph from the edge list, with relationship properties as edge attributes
+G = nx.from_pandas_edgelist(df, source="source", target="target", edge_attr=["relationship", "month", "event_date", "fatalities", "latitude", "longitude"])
+
+# Set node attributes for source and target categories
+for _, row in df.iterrows():
+    # Set source node attribute
+    if row['source'] in G.nodes:
+        G.nodes[row['source']]['category'] = row['source_category']
+    
+    # Set target node attribute
+    if row['target'] in G.nodes:
+        G.nodes[row['target']]['category'] = row['target_category']
+
+```
+
+### Visualize
+Time to make a interactive graph using plotly, where people can select a month and the type of relationship, i.e., Battles or protests. 
+```{python}
+import plotly.graph_objects as go
+from collections import deque
+
+def create_network_visualization(G):
+    """
+    Create an interactive network visualization with Plotly dropdown filters
+    
+    Parameters:
+    -----------
+    G : networkx.Graph
+        The input graph
+    """
+    
+    # Get unique months and relationships
+    months = set()
+    relationships = set()
+    for _, _, data in G.edges(data=True):
+        months.add(data['month'])
+        relationships.add(data['relationship'])
+    
+    months = sorted(list(months))
+    relationships = sorted(list(relationships))
+    
+    # Calculate base layout once
+    pos = nx.spring_layout(G)
+    
+    # Create traces for each combination of month and relationship
+    traces = []
+    
+    for month in [None] + months:
+        for rel in [None] + relationships:
+            # Filter edges based on current combination
+            edges_to_keep = []
+            for source, target, edge_data in G.edges(data=True):
+                month_match = True if month is None else edge_data['month'] == month
+                rel_match = True if rel is None else edge_data['relationship'] == rel
+                
+                if month_match and rel_match:
+                    edges_to_keep.append((source, target))
+            
+            # Create subgraph
+            H = G.edge_subgraph(edges_to_keep)
+            
+            # Create edge trace
+            edge_x = []
+            edge_y = []
+            edge_text = []
+            
+            mnode_x, mnode_y, mnode_txt = [], [], []
+            
+            for edge in H.edges(data=True):
+                x0, y0 = pos[edge[0]]
+                x1, y1 = pos[edge[1]]
+                edge_x.extend([x0, x1, None])
+                edge_y.extend([y0, y1, None])
+                
+                # Midpoint calculation
+                mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+                
+                # Hover text for midpoint
+                edge_info = (
+                    f"<b>Relationship:</b> {edge[2]['relationship']}<br>"
+                    f"<b>Month:</b> {edge[2]['month']}<br>"
+                    f"<b>Date:</b> {edge[2]['event_date']}<br>"
+                    f"<b>Fatalities:</b> {edge[2]['fatalities']}<br>"
+                    f"<b>Location:</b> ({edge[2]['latitude']}, {edge[2]['longitude']})"
+                )
+                
+                mnode_x.append(mx)
+                mnode_y.append(my)
+                mnode_txt.append(edge_info)
+            
+            # Create node trace
+            node_x = []
+            node_y = []
+            node_text = []
+            
+            for node in H.nodes():
+                x, y = pos[node]
+                node_x.append(x)
+                node_y.append(y)
+                node_text.append(f"Node: {node}")
+            
+            # Create traces for this combination
+            edge_trace = go.Scatter(
+                x=edge_x, y=edge_y,
+                line=dict(width=0.5, color='#888'),
+                hoverinfo='none',
+                mode='lines',
+                name='Edges',
+                visible=(month is None and rel is None),
+                showlegend=False
+            )
+            
+            node_trace = go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                hoverinfo='text',
+                text=node_text,
+                marker=dict(
+                    size=10,
+                    color='#1f77b4',
+                    line_width=2
+                ),
+                name='Nodes',
+                visible=(month is None and rel is None),
+                showlegend=False
+            )
+            
+            mnode_trace = go.Scatter(
+                x=mnode_x, y=mnode_y,
+                mode='markers',
+                hoverinfo='text',
+                hovertext=mnode_txt,
+                marker=dict(opacity=0),
+                showlegend=False
+            )
+            
+            traces.extend([edge_trace, node_trace, mnode_trace])
+    
+    # Create dropdown menus
+    def create_visibility_list(selected_month, selected_rel):
+        visibility = []
+        for m in [None] + months:
+            for r in [None] + relationships:
+                is_visible = (selected_month is None or m == selected_month) and \
+                           (selected_rel is None or r == selected_rel)
+                visibility.extend([is_visible] * 3)  # For edge, node and midpoint traces
+        return visibility
+    
+    # Create buttons for month dropdown
+    buttons_month = [
+        dict(
+            args=[{"visible": create_visibility_list(m, None)}],
+            label="All" if m is None else f"Month {m}",
+            method="update"
+        ) for m in [None] + months
+    ]
+    
+    # Create buttons for relationship dropdown
+    buttons_rel = [
+        dict(
+            args=[{"visible": create_visibility_list(None, r)}],
+            label="All" if r is None else r,
+            method="update"
+        ) for r in [None] + relationships
+    ]
+    
+    # Create figure
+    fig = go.Figure(
+        data=traces,
+        layout=go.Layout(
+            title="Network Graph",
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20,l=5,r=5,t=40),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            annotations=[
+                dict(
+                    text="Filter by Month ▼",
+                    x=0.1,
+                    y=1.15,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    font=dict(size=12)
+                ),
+                dict(
+                    text="Filter by Relationship ▼",
+                    x=0.3,
+                    y=1.15,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    font=dict(size=12)
+                )
+            ],
+            updatemenus=[
+                dict(
+                    buttons=buttons_month,
+                    direction="down",
+                    showactive=True,
+                    x=0.1,
+                    xanchor="left",
+                    y=1.1,
+                    yanchor="top",
+                    name="Month"
+                ),
+                dict(
+                    buttons=buttons_rel,
+                    direction="down",
+                    showactive=True,
+                    x=0.3,
+                    xanchor="left",
+                    y=1.1,
+                    yanchor="top",
+                    name="Relationship"
+                )
+            ]
+        )
+    )
+    
+    return fig
+
+# Usage example:
+fig = create_network_visualization(G)
+fig.show()
+```
+
+

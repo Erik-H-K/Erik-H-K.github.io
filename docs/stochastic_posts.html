@@ -154,11 +154,11 @@ window.Quarto = {
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
     <a class="nav-link" href="./index.html"> 
-<span class="menu-text">Home</span></a>
+<span class="menu-text">home</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./about.html"> 
-<span class="menu-text">Who Am I?</span></a>
+<span class="menu-text">who am I</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./projects.html"> 
@@ -199,7 +199,7 @@ window.Quarto = {
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         
-    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(1)</span></div><div class="category" data-category="DIY">DIY <span class="quarto-category-count">(1)</span></div><div class="category" data-category="R">R <span class="quarto-category-count">(1)</span></div><div class="category" data-category="solar">solar <span class="quarto-category-count">(1)</span></div></div></div>
+    <h5 class="quarto-listing-category-title">Categories</h5><div class="quarto-listing-category category-default"><div class="category" data-category="">All <span class="quarto-category-count">(2)</span></div><div class="category" data-category="Cypher">Cypher <span class="quarto-category-count">(1)</span></div><div class="category" data-category="DIY">DIY <span class="quarto-category-count">(1)</span></div><div class="category" data-category="NEO4J">NEO4J <span class="quarto-category-count">(1)</span></div><div class="category" data-category="Network">Network <span class="quarto-category-count">(1)</span></div><div class="category" data-category="Python">Python <span class="quarto-category-count">(1)</span></div><div class="category" data-category="R">R <span class="quarto-category-count">(1)</span></div><div class="category" data-category="solar">solar <span class="quarto-category-count">(1)</span></div></div></div>
 <!-- main -->
 <main class="content quarto-banner-title-block column-page-left" id="quarto-document-content">
 
@@ -213,7 +213,49 @@ window.Quarto = {
 
 <div class="quarto-listing quarto-listing-container-default" id="listing-listing">
 <div class="list quarto-listing-default">
-<div class="quarto-post image-right" data-index="0" data-categories="R,DIY,solar" data-listing-date-sort="1726783200000" data-listing-file-modified-sort="1728306938884" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="4" data-listing-word-count-sort="667">
+<div class="quarto-post image-right" data-index="0" data-categories="Python,Network,Cypher,NEO4J" data-listing-date-sort="1729375200000" data-listing-file-modified-sort="1729691766850" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="25" data-listing-word-count-sort="5000">
+<div class="thumbnail">
+<p><a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external"></a></p><a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external">
+<p><img src="./posts/2024-10-23-interactive-graph-neo4j/network.png" class="thumbnail-image"></p>
+</a><p><a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external"></a></p>
+</div>
+<div class="body">
+<h3 class="no-anchor listing-title">
+<a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external">Mali violent interaction graph</a>
+</h3>
+<div class="listing-subtitle">
+<a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external"></a>
+</div>
+<div class="listing-categories">
+<div class="listing-category" onclick="window.quartoListingCategory('Python'); return false;">
+Python
+</div>
+<div class="listing-category" onclick="window.quartoListingCategory('Network'); return false;">
+Network
+</div>
+<div class="listing-category" onclick="window.quartoListingCategory('Cypher'); return false;">
+Cypher
+</div>
+<div class="listing-category" onclick="window.quartoListingCategory('NEO4J'); return false;">
+NEO4J
+</div>
+</div>
+<div class="listing-description">
+<a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external">Currently I am wokring on getting to know the graph database NEO4J and it’s CYPHER database language.</a>
+</div>
+</div>
+<div class="metadata">
+<a href="./posts/2024-10-23-interactive-graph-neo4j/index.html" class="no-external">
+<div class="listing-date">
+Oct 20, 2024
+</div>
+<div class="listing-author">
+Erik H. K, Erik H. K
+</div>
+</a>
+</div>
+</div>
+<div class="quarto-post image-right" data-index="1" data-categories="R,DIY,solar" data-listing-date-sort="1726783200000" data-listing-file-modified-sort="1728306938884" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="4" data-listing-word-count-sort="667">
 <div class="thumbnail">
 <p><a href="./posts/2024-09-20-solar-panels-angle-shadow/index.html" class="no-external"></a></p><a href="./posts/2024-09-20-solar-panels-angle-shadow/index.html" class="no-external">
 <p><img src="./posts/2024-09-20-solar-panels-angle-shadow/Row_spacing2.jpg" class="thumbnail-image"></p>
@@ -482,7 +524,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
     var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
     var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp('/' + window.location.host + '/');
+      var filterRegex = new RegExp("https:\/\/ErikHK\.github\.io\/");
     var isInternal = (href) => {
         return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
     }
