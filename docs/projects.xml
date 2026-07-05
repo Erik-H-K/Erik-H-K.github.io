@@ -14,7 +14,7 @@
 <item>
   <title>Can we count peace? A mapping of quantitative sources for peacebuilding impact evaluation</title>
   <dc:creator>Erik H. Knudsen</dc:creator>
-  <link>https://ErikHK.github.io/projects/05-07-2026-Measuring-Peace/index_v3.html</link>
+  <link>https://ErikHK.github.io/projects/05-07-2026-Measuring-Peace/</link>
   <description><![CDATA[ 
 
 
@@ -22,8 +22,8 @@
 
 
 
-<section id="can-we-count-peace-a-mapping-of-quantitative-sources-for-peacebuilding-impact-evaluation" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Can we count peace? A mapping of quantitative sources for peacebuilding impact evaluation</h1>
+<section id="introduction-choosing-good-indicators-for-peacebuilding-impact-evaluations" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction: Choosing good indicators for peacebuilding impact evaluations</h1>
 <p>Conducting impact evaluations of peacebuilding projects is a notoriously hard challenge due to the multidimensional nature of peace and the multiple conceptions of the term <span class="citation" data-cites="davenportContemporaryStudiesPeace2018">(Davenport et al. 2018)</span>, which from an applied research and evaluation perspective creates certain challenges when it comes to measuring peace as an outcome. Recently, I, together with colleagues at NCG, finished a series of peacebuilding impact evaluations, where we had to deal with the above challenges. Therefore, I will in this blog post describe how we dealt with these challenges, moving from definition to operationalisation. Hereafter, I will outline examples of open-source data sources that we used and others that can be applied. While both qualitative and quantative data sources are equally valuable when measuring peacebuilding initiatives, I will in this mapping restrict the focus to quantitative data, a choice which is primaraly grounded in my expereince with the data type and the lack of a unified list of potential data sources. The below classes of data sources will be investigated using concrete examples and both R and Python code to recreate the examples are provided:</p>
 <ul>
 <li>Observed levels of violence using ACLED or UCDP data</li>
@@ -7407,7 +7407,7 @@ Weidmann, Nils B. 2016. <span>“A <span>Closer Look</span> at <span>Reporting B
   <category>Peacebuilding</category>
   <category>Measurement</category>
   <category>Data</category>
-  <guid>https://ErikHK.github.io/projects/05-07-2026-Measuring-Peace/index_v3.html</guid>
+  <guid>https://ErikHK.github.io/projects/05-07-2026-Measuring-Peace/</guid>
   <pubDate>Sat, 04 Jul 2026 22:00:00 GMT</pubDate>
   <media:content url="https://ErikHK.github.io/projects/05-07-2026-Measuring-Peace/figures/Johannes_Vermeer.jpg" medium="image" type="image/jpeg"/>
 </item>
